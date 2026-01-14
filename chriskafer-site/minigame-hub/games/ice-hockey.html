@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ice Hockey - Safe UI Edition</title>
+    <style>
+        :root { --bg: #ecf0f1; --cont: #ffffff; --text: #2c3e50; --accent: #3498db; --rink: #f7f9fa; }
+        [data-theme="dark"] { --bg: #2c3e50; --cont: #34495e; --text: #ecf0f1; --rink: #1e272e; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; transition: 0.3s; overflow: hidden; }
+        .nav-btn { position: absolute; top: 20px; left: 20px; background: #e67e22; color: white; text-decoration: none; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 1000; box-shadow: 0 4px 0 #d35400; }
+        .theme-btn { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-radius: 5px; cursor: pointer; background: var(--cont); color: var(--text); border: 2px solid var(--accent); font-size: 20px; }
+        #lobby, #game-container { background: var(--cont); padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; width: 450px; position: relative; transition: 0.2s; }
+        #game-container { display: none; padding: 0; }
+        .goal-flash { box-shadow: inset 0 0 50px #e74c3c !important; border-color: #e74c3c !important; }
+        .card-setting { margin-bottom: 0.8rem; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 10px; text-align: left; }
+        label { font-size: 11px; font-weight: bold; display: block; margin-bottom: 5px; opacity: 0.8; text-transform: uppercase; }
+        select, input[type="range"] { width: 100%; margin-top: 5px; border-radius: 8px; padding: 8px; border: 1px solid var(--accent); background: var(--bg); color: var(--text); }
+        .action-btn { width: 100%; background: var(--accent); color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; padding: 12px; border-radius: 8px; box-shadow: 0 4px 0 #2980b9; text-transform: uppercase; }
+        canvas { background: var(--rink); border: 8px solid var(--accent); border-radius: 10px; display: block; margin: 0 auto; cursor: none; transition: 0.2s; }
+        .score-box { font-size: 32px; font-weight: 900; margin: 10px 0; }
+        
+        /* ADJUSTED END MENU */
+        #end-menu { position: absolute; inset: 0; background: rgba(0,0,0,0.85); border-radius: 20px; display: none; flex-direction: column; justify-content: flex-end; align-items: center; color: white; z-index: 100; padding-bottom: 40px; }
+        #win-text { margin-bottom: 60px; font-size: 32px; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn">🏠 HOME</a>
+    <button class="theme-btn" onclick="toggleTheme()">🌓</button>
+
+    <div id="lobby">
+        <h1 style="margin-top:0; color:var(--accent);">ICE HOCKEY</h1>
+        <div class="card-setting"><label>AI Difficulty</label>
+            <select id="diff">
+                <option value="easy">Easy (Reaction Lag)</option>
+                <option value="medium">Medium (Steady)</option>
+                <option value="hard" selected>Hard (Fair Pro)</option>
+            </select>
+        </div>
+        <div class="card-setting"><label>Puck Friction</label><input type="range" id="speed" min="5" max="10" value="7"></div>
+        <button class="action-btn" onclick="startGame()">START MATCH</button>
+    </div>
+
+    <div id="game-container">
+        <div class="score-box" id="score">0 - 0</div>
+        <canvas id="hockeyCanvas" width="400" height="600"></canvas>
+        <div id="end-menu">
+            <h2 id="win-text">GOAL!</h2>
+            <button class="action-btn" onclick="resetGame()" style="width:220px; background:#2ecc71; box-shadow:0 4px 0 #27ae60;">RETRY</button>
+            <button class="action-btn" onclick="location.reload()" style="width:220px; background:#95a5a6; box-shadow:none; margin-top:15px;">MAIN MENU</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('hockeyCanvas');
+    const ctx = canvas.getContext('2d');
+    const puckRadius = 12, paddleRadius = 30, goalWidth = 160;
+    const endMenu = document.getElementById('end-menu');
+    const MAX_PUCK_SPEED = 20;
+
+    let puck, cpu, scoreP1 = 0, scoreCPU = 0, gameActive = false;
+    let baseSpeed, difficulty, mouseX = 200, mouseY = 500, lastMouseX = 200, lastMouseY = 500;
+    let puckHistory = [];
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSfx(freq, type, dur, vol = 0.1) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+    }
+
+    function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+    function flashGoal() {
+        canvas.classList.add('goal-flash');
+        setTimeout(() => canvas.classList.remove('goal-flash'), 500);
+    }
+
+    function startGame() {
+        baseSpeed = parseInt(document.getElementById('speed').value);
+        difficulty = document.getElementById('diff').value;
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        scoreP1 = 0; scoreCPU = 0;
+        resetGame();
+    }
+
+    function resetGame() {
+        document.getElementById('score').innerText = `${scoreP1} - ${scoreCPU}`;
+        endMenu.style.display = 'none';
+        puck = { x: 200, y: 300, vx: 0, vy: 0 };
+        cpu = { x: 200, y: 60, vx: 0, vy: 0 };
+        puckHistory = [];
+        if (!gameActive) { gameActive = true; update(); }
+    }
+
+    function update() {
+        if (!gameActive) return;
+
+        let pmvx = mouseX - lastMouseX;
+        let pmvy = mouseY - lastMouseY;
+        lastMouseX = mouseX; lastMouseY = mouseY;
+
+        let currentSpeed = Math.hypot(puck.vx, puck.vy);
+        if (currentSpeed > MAX_PUCK_SPEED) {
+            let ratio = MAX_PUCK_SPEED / currentSpeed;
+            puck.vx *= ratio; puck.vy *= ratio;
+        }
+
+        puck.x += puck.vx; puck.y += puck.vy;
+        puck.vx *= 0.993; puck.vy *= 0.993; //
+
+        puckHistory.push({x: puck.x, y: puck.y});
+        if (puckHistory.length > 30) puckHistory.shift();
+
+        if (puck.x < puckRadius || puck.x > canvas.width - puckRadius) {
+            puck.vx *= -0.8; puck.x = puck.x < puckRadius ? puckRadius : canvas.width - puckRadius;
+            playSfx(150, 'triangle', 0.2, 0.05);
+        }
+
+        if (puck.y < 0 || puck.y > canvas.height) {
+            if (puck.x > (canvas.width - goalWidth)/2 && puck.x < (canvas.width + goalWidth)/2) {
+                if (puck.y < 0) scoreP1++; else scoreCPU++;
+                document.getElementById('score').innerText = `${scoreP1} - ${scoreCPU}`;
+                playSfx(800, 'sawtooth', 0.6, 0.1);
+                flashGoal();
+                gameActive = false; endMenu.style.display = 'flex';
+                document.getElementById('win-text').innerText = puck.y < 0 ? "POINT SCORED!" : "CPU SCORED!";
+            } else {
+                puck.vy *= -0.8; puck.y = puck.y < 0 ? 1 : canvas.height - 1;
+                playSfx(150, 'triangle', 0.2, 0.05);
+            }
+        }
+
+        let lag = (difficulty === 'easy') ? 25 : (difficulty === 'medium' ? 12 : 0);
+        let aiFlex = (difficulty === 'hard') ? 0.14 : (difficulty === 'medium' ? 0.08 : 0.05);
+        let aiSpeedLimit = (difficulty === 'hard') ? 8 : (difficulty === 'medium' ? 5 : 3.5);
+        let targetPuck = puckHistory[puckHistory.length - 1 - lag] || puck;
+        let shouldTrack = true;
+        if (difficulty === 'easy' && puck.y > canvas.height * 0.45) shouldTrack = false;
+        if (difficulty === 'medium' && puck.y > canvas.height * 0.7) shouldTrack = false;
+
+        let lastCpuX = cpu.x; let lastCpuY = cpu.y;
+        if (shouldTrack) {
+            let dx = targetPuck.x - cpu.x;
+            cpu.x += Math.sign(dx) * Math.min(Math.abs(dx * aiFlex), aiSpeedLimit);
+            let aiTargetY = (targetPuck.y < canvas.height * 0.4) ? targetPuck.y - 10 : 70;
+            let dy = aiTargetY - cpu.y;
+            cpu.y += Math.sign(dy) * Math.min(Math.abs(dy * aiFlex), aiSpeedLimit * 0.7);
+        } else {
+            cpu.x += (200 - cpu.x) * 0.05; cpu.y += (60 - cpu.y) * 0.05;
+        }
+        cpu.vx = cpu.x - lastCpuX; cpu.vy = cpu.y - lastCpuY;
+
+        function handleCollision(p, paddle, mvx, mvy, sfxFreq) {
+            let dist = Math.hypot(p.x - paddle.x, p.y - paddle.y);
+            if (dist < puckRadius + paddleRadius) {
+                let angle = Math.atan2(p.y - paddle.y, p.x - paddle.x);
+                let hitSpeed = Math.hypot(mvx, mvy);
+                let finalPower = (hitSpeed > 1) ? (hitSpeed * 0.75 + baseSpeed) : (Math.hypot(p.vx, p.vy) * 0.6 + 1);
+                p.vx = Math.cos(angle) * finalPower; p.vy = Math.sin(angle) * finalPower;
+                p.x = paddle.x + Math.cos(angle) * (puckRadius + paddleRadius + 1);
+                p.y = paddle.y + Math.sin(angle) * (puckRadius + paddleRadius + 1);
+                playSfx(sfxFreq, 'sine', 0.1);
+            }
+        }
+
+        handleCollision(puck, {x: mouseX, y: mouseY}, pmvx, pmvy, 1200);
+        handleCollision(puck, cpu, cpu.vx, cpu.vy, 1000);
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "rgba(52, 152, 219, 0.2)"; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(0, 300); ctx.lineTo(400, 300); ctx.stroke();
+        ctx.beginPath(); ctx.arc(200, 300, 60, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = "#e74c3c";
+        ctx.fillRect((400-goalWidth)/2, 0, goalWidth, 8);
+        ctx.fillRect((400-goalWidth)/2, 592, goalWidth, 8);
+        ctx.fillStyle = "#2c3e50"; ctx.beginPath(); ctx.arc(puck.x, puck.y, puckRadius, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#3498db"; ctx.beginPath(); ctx.arc(mouseX, mouseY, paddleRadius, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#e74c3c"; ctx.beginPath(); ctx.arc(cpu.x, cpu.y, paddleRadius, 0, Math.PI*2); ctx.fill();
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = Math.max(330, e.clientY - rect.top);
+    });
+</script>
+</body>
+</html>

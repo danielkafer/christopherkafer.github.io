@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Pro - Fully Integrated Theme</title>
+    <style>
+        :root { --bg: #ecf0f1; --cont: #ffffff; --text: #2c3e50; --accent: #27ae60; --border: #bdc3c7; }
+        [data-theme="dark"] { --bg: #2c3e50; --cont: #34495e; --text: #ecf0f1; --border: #555; }
+        
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; transition: background 0.3s, color 0.3s; overflow: hidden; }
+        
+        .nav-btn { position: absolute; top: 20px; left: 20px; background: #e67e22; color: white; text-decoration: none; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 1000; cursor: pointer; border: none; box-shadow: 0 4px 0 #d35400; }
+        .small-btn { position: absolute; top: 20px; right: 55px; background: var(--cont); border: 2px solid var(--border); border-radius: 5px; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; z-index: 1000; color: var(--text); transition: 0.3s; }
+
+        #lobby, #game-container { background: var(--cont); padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; width: 440px; position: relative; max-height: 90vh; overflow-y: auto; transition: background 0.3s; }
+        #game-container { display: none; overflow: hidden; }
+        
+        .card-setting { margin-bottom: 0.8rem; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 10px; text-align: left; }
+        label { font-size: 11px; font-weight: bold; display: block; margin-bottom: 5px; opacity: 0.8; text-transform: uppercase; }
+        select, input[type="range"] { width: 100%; margin-top: 5px; border-radius: 8px; padding: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+        .action-btn { width: 100%; background: var(--accent); color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; padding: 12px; border-radius: 8px; box-shadow: 0 4px 0 #219150; text-transform: uppercase; }
+
+        .score-row { display: flex; justify-content: space-around; font-weight: bold; margin-bottom: 10px; }
+        #canvas-wrapper { border: 15px solid var(--border); border-radius: 5px; display: inline-block; line-height: 0; transition: border 0.3s; }
+        canvas { background: #000; display: block; }
+
+        #end-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); border-radius: 20px; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; padding: 20px; box-sizing: border-box; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn">🏠 HOME</a>
+    <button class="small-btn" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+
+    <div id="lobby">
+        <h1>Snake Pro</h1>
+        <div class="card-setting" style="text-align: center; background: rgba(241, 196, 15, 0.1);">
+            <label>🏆 Personal Best</label>
+            <div id="lobby-high-score" style="font-size: 24px; font-weight: 900; color: #f1c40f;">0</div>
+        </div>
+
+        <div class="card-setting">
+            <label>Snake Skin</label>
+            <select id="snake-icon-select">
+                <option value="none">None (Solid Color)</option>
+                <option value="👽">👽 Alien</option><option value="👾">👾 Monster</option>
+                <option value="🐯">🐯 Tiger</option><option value="🦁">🦁 Lion</option>
+                <option value="🦍">🦍 Gorilla</option><option value="🐈">🐈 Cat</option>
+                <option value="🦖">🦖 T-Rex</option><option value="🐊">🐊 Crocodile</option>
+            </select>
+        </div>
+
+        <div class="card-setting">
+            <label>Food Type</label>
+            <select id="food-icon-select">
+                <option value="none">Red Square</option>
+                <option value="🍕">🍕 Pizza</option><option value="🍔">🍔 Burger</option>
+                <option value="🍟">🍟 Fries</option><option value="🌭">🌭 Hot Dog</option>
+                <option value="🍎">🍎 Apple</option>
+            </select>
+        </div>
+
+        <div class="card-setting">
+            <label>Visual Style</label>
+            <select id="style-select">
+                <option value="color">Color Only</option>
+                <option value="color-neon">Color + Neon</option>
+                <option value="icon">Icon Only</option>
+                <option value="icon-neon" selected>Icon + Neon</option>
+            </select>
+        </div>
+
+        <div class="card-setting"><label>Snake Color</label><input type="color" id="color-picker" value="#2ecc71" style="width:100%; height:40px; border:none; padding:0;"></div>
+        <div class="card-setting"><label>Game Speed</label><input type="range" id="speed-slider" min="40" max="250" value="100" step="10"></div>
+
+        <button class="action-btn" onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="game-container">
+        <div class="score-row">
+            <div>SCORE: <span id="score">0</span></div>
+            <div>BEST: <span id="game-high-score">0</span></div>
+        </div>
+        <div id="canvas-wrapper"><canvas id="snakeCanvas"></canvas></div>
+        <div id="end-menu">
+            <h2 id="end-title" style="color:#f1c40f">GAME OVER!</h2>
+            <p id="final-score" style="color:white; font-size: 20px;"></p>
+            <button class="action-btn" onclick="startGame()">RETRY</button>
+            <button class="action-btn" onclick="location.reload()" style="background:#95a5a6; box-shadow:0 4px 0 #7f8c8d;">MENU</button>
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('snakeCanvas');
+const ctx = canvas.getContext('2d');
+const box = 20;
+const gridSize = 18;
+canvas.width = canvas.height = gridSize * box;
+
+let snake, food, d, score, gameLoop, speed;
+let sEmoji, fEmoji, visualStyle, sColor;
+let gameActive = false, nextDir = null;
+
+let highScore = localStorage.getItem('snakeHighScore') || 0;
+document.getElementById('lobby-high-score').innerText = highScore;
+document.getElementById('game-high-score').innerText = highScore;
+
+function toggleTheme() {
+    document.body.dataset.theme =
+        document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+}
+
+window.addEventListener("keydown", e => {
+    const k = e.key.toLowerCase();
+    if ((k === "a" || e.keyCode === 37) && d !== "RIGHT") nextDir = "LEFT";
+    else if ((k === "w" || e.keyCode === 38) && d !== "DOWN") nextDir = "UP";
+    else if ((k === "d" || e.keyCode === 39) && d !== "LEFT") nextDir = "RIGHT";
+    else if ((k === "s" || e.keyCode === 40) && d !== "UP") nextDir = "DOWN";
+});
+
+function startGame() {
+    sEmoji = document.getElementById('snake-icon-select').value;
+    fEmoji = document.getElementById('food-icon-select').value;
+    visualStyle = document.getElementById('style-select').value;
+    sColor = document.getElementById('color-picker').value;
+    // Map speed correctly: lower value = faster interval
+    speed = 300 - parseInt(document.getElementById('speed-slider').value);
+
+    document.getElementById('lobby').style.display = 'none';
+    document.getElementById('game-container').style.display = 'block';
+    reset();
+}
+
+function reset() {
+    score = 0;
+    document.getElementById('score').innerText = 0;
+    document.getElementById('end-menu').style.display = 'none';
+    snake = [{ x: 8 * box, y: 8 * box }];
+    d = null;
+    nextDir = null;
+    spawnFood();
+    gameActive = true;
+    clearInterval(gameLoop);
+    gameLoop = setInterval(draw, speed);
+}
+
+function spawnFood() {
+    do {
+        food = {
+            x: Math.floor(Math.random() * gridSize) * box,
+            y: Math.floor(Math.random() * gridSize) * box
+        };
+    } while (snake.some(p => p.x === food.x && p.y === food.y));
+}
+
+function draw() {
+    if (!gameActive) return;
+
+    if (nextDir) {
+        d = nextDir;
+        nextDir = null;
+    }
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Food
+    if (fEmoji === "none") {
+        ctx.fillStyle = "red";
+        ctx.fillRect(food.x + 2, food.y + 2, box - 4, box - 4);
+    } else {
+        ctx.font = "16px serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(fEmoji, food.x + box / 2, food.y + box / 2);
+    }
+
+    // Snake
+    snake.forEach(p => {
+        ctx.save();
+        if (visualStyle.includes("neon")) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = sColor;
+        }
+        if (visualStyle.startsWith("icon") && sEmoji !== "none") {
+            ctx.fillStyle = visualStyle.includes("neon") ? sColor : "white";
+            ctx.font = "16px serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(sEmoji, p.x + box / 2, p.y + box / 2);
+        } else {
+            ctx.fillStyle = sColor;
+            ctx.fillRect(p.x, p.y, box - 1, box - 1);
+        }
+        ctx.restore();
+    });
+
+    if (!d) return;
+
+    let headX = snake[0].x;
+    let headY = snake[0].y;
+
+    if (d === "LEFT") headX -= box;
+    else if (d === "RIGHT") headX += box;
+    else if (d === "UP") headY -= box;
+    else if (d === "DOWN") headY += box;
+
+    // Precision Hitbox (No buffer)
+    if (
+        headX < 0 ||
+        headX >= canvas.width ||
+        headY < 0 ||
+        headY >= canvas.height ||
+        snake.some(p => p.x === headX && p.y === headY)
+    ) {
+        triggerGameOver();
+        return;
+    }
+
+    if (headX === food.x && headY === food.y) {
+        score++;
+        document.getElementById('score').innerText = score;
+        spawnFood();
+    } else {
+        snake.pop();
+    }
+
+    snake.unshift({ x: headX, y: headY });
+}
+
+function triggerGameOver() {
+    gameActive = false;
+    clearInterval(gameLoop);
+    setTimeout(gameOver, 150);
+}
+
+function gameOver() {
+    document.getElementById('final-score').innerText = "Score: " + score;
+    document.getElementById('end-menu').style.display = "flex";
+
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem("snakeHighScore", highScore);
+        document.getElementById('lobby-high-score').innerText = highScore;
+        document.getElementById('game-high-score').innerText = highScore;
+    }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vertical Padel - Kinetic Physics</title>
+    <style>
+        :root { --bg: #2c3e50; --cont: #ffffff; --text: #2c3e50; --accent: #27ae60; }
+        [data-theme="dark"] { --bg: #2c3e50; --cont: #34495e; --text: #ecf0f1; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Arial Black', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; transition: 0.3s; overflow: hidden; }
+        .nav-btn { position: absolute; top: 20px; background: #e67e22; color: white; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 1000; cursor: pointer; border: none; box-shadow: 0 4px 0 #d35400; text-decoration: none; }
+        .home-btn { left: 20px; } .theme-btn { right: 20px; }
+        #lobby, #game-container { background: var(--cont); padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; width: 440px; position: relative; }
+        #game-container { display: none; padding: 0; }
+        canvas { background: #0e301b; border: 6px solid #555; border-radius: 5px; display: block; margin: 0 auto; cursor: none; }
+        .score-box { font-size: 32px; font-weight: 900; margin: 10px 0; }
+        .card-setting { margin-bottom: 0.8rem; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; text-align: left; }
+        label { font-size: 11px; opacity: 0.8; text-transform: uppercase; }
+        .action-btn { width: 100%; background: #27ae60; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; padding: 14px; border-radius: 8px; box-shadow: 0 4px 0 #1e8449; font-size: 16px; text-transform: uppercase; }
+        #end-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); border-radius: 20px; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; color: white; }
+        input[type="range"], select { width: 100%; margin-top: 5px; cursor: pointer; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn home-btn">🏠 HOME</a>
+    <button class="nav-btn theme-btn" onclick="toggleTheme()">🌓</button>
+
+    <div id="lobby">
+        <h1 style="margin-top:0; color: #2ecc71;">VERTICAL PADEL</h1>
+        <div class="card-setting"><label>Game Mode</label>
+            <select id="mode-select"><option value="vs">Versus AI</option><option value="wall">Wall Practice</option></select>
+        </div>
+        <div class="card-setting"><label>Base Speed (Swing harder for more power)</label><input type="range" id="speed-slider" min="1" max="10" value="5"></div>
+        <div class="card-setting"><label>Ball Size</label><input type="range" id="size-slider" min="6" max="20" value="10"></div>
+        <div class="card-setting" id="ai-diff-container"><label>AI Difficulty</label><select id="diff-select"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard (Invincible)</option></select></div>
+        <button class="action-btn" onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="game-container">
+        <div class="score-box" id="p-score">0 - 0</div>
+        <canvas id="padelCanvas" width="400" height="600"></canvas>
+        <div id="end-menu">
+            <h2 id="end-title" style="font-size: 32px;">GAME OVER</h2>
+            <button class="action-btn" onclick="nextRound()" style="width:220px">RETRY</button>
+            <button class="action-btn" onclick="location.reload()" style="width:220px; background:#95a5a6; box-shadow: 0 4px 0 #7f8c8d;">MENU</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('padelCanvas');
+    const ctx = canvas.getContext('2d');
+    let ball, p1, cpu, gameActive = false, animationId;
+    let pScore = 0, cpuScore = 0, ballSpeedBase, ballRadius, aiDifficulty, gameMode;
+    let mouseX = 200, mouseY = 500, lastMouseX = 200, lastMouseY = 500, swingSpeed = 0;
+
+    function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+
+    function startGame() {
+        ballSpeedBase = parseInt(document.getElementById('speed-slider').value) + 4;
+        ballRadius = parseInt(document.getElementById('size-slider').value);
+        aiDifficulty = document.getElementById('diff-select').value;
+        gameMode = document.getElementById('mode-select').value;
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        if(gameMode === 'wall') document.getElementById('p-score').innerText = "PRACTICE";
+        nextRound();
+    }
+
+    function nextRound() {
+        gameActive = true;
+        document.getElementById('end-menu').style.display = 'none';
+        cpu = { x: canvas.width/2 - 40, y: 15, w: 80, h: 12 };
+        p1 = { r: 38 }; 
+        ball = { x: canvas.width/2, y: canvas.height/2, r: ballRadius, vx: (Math.random()-0.5)*ballSpeedBase, vy: -ballSpeedBase };
+        update();
+    }
+
+    function update() {
+        if(!gameActive) return;
+        
+        // Track mouse swing intensity
+        let dmx = mouseX - lastMouseX;
+        let dmy = mouseY - lastMouseY;
+        swingSpeed = Math.sqrt(dmx * dmx + dmy * dmy);
+        lastMouseX = mouseX; lastMouseY = mouseY;
+
+        ball.x += ball.vx; ball.y += ball.vy;
+
+        if(ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
+            ball.vx *= -1;
+            ball.x = ball.x - ball.r < 0 ? ball.r : canvas.width - ball.r;
+        }
+
+        if (gameMode === 'wall') {
+            if (ball.y - ball.r < 0) { ball.vy = Math.abs(ball.vy); ball.y = ball.r; }
+        } else {
+            let cpuCenter = cpu.x + cpu.w/2;
+            if (aiDifficulty === 'hard') cpu.x = ball.x - cpu.w/2;
+            else if (aiDifficulty === 'medium') {
+                let aiSpeed = Math.abs(ball.vx) + 2.5;
+                if (cpuCenter < ball.x - 5) cpu.x += aiSpeed;
+                else if (cpuCenter > ball.x + 5) cpu.x -= aiSpeed;
+            } else {
+                if (cpuCenter < ball.x - 20) cpu.x += ballSpeedBase * 0.5;
+                else if (cpuCenter > ball.x + 20) cpu.x -= ballSpeedBase * 0.5;
+            }
+            if(cpu.x < 0) cpu.x = 0; if(cpu.x + cpu.w > canvas.width) cpu.x = canvas.width - cpu.w;
+            
+            if(ball.vy < 0 && ball.y - ball.r < cpu.y + cpu.h && ball.y > cpu.y && ball.x > cpu.x && ball.x < cpu.x + cpu.w) {
+                ball.vy = Math.abs(ball.vy); ball.y = cpu.y + cpu.h + ball.r;
+            }
+        }
+
+        // --- DYNAMIC KINETIC PHYSICS ---
+        let dx = ball.x - mouseX;
+        let dy = ball.y - mouseY;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        let minDistance = ball.r + p1.r;
+
+        if (distance < minDistance && ball.vy > 0) {
+            let angle = Math.atan2(dy, dx);
+            
+            // 1. Edge Damping: 1.8x slower if hitting the frame (outer 15% of racket)
+            let damping = (distance > p1.r * 0.85) ? (1 / 1.8) : 1.0; 
+            
+            // 2. Power Swing: Scale speed from 0.5x to 1.5x based on swing intensity
+            // swingSpeed of 0-25 maps to 0.5 - 1.5 multiplier
+            let powerMult = 0.5 + Math.min(1.0, swingSpeed / 25);
+            
+            let finalSpeed = ballSpeedBase * damping * powerMult;
+
+            ball.vy = -Math.abs(Math.sin(angle) * finalSpeed);
+            ball.vx = (Math.cos(angle) * finalSpeed) + (dmx * 0.3);
+            
+            ball.y = mouseY - minDistance; 
+        }
+
+        if(ball.y > canvas.height + 50 || (gameMode !== 'wall' && ball.y < -50)) {
+            gameActive = false; cancelAnimationFrame(animationId); handleEnd(ball.y < 0); return;
+        }
+
+        draw();
+        animationId = requestAnimationFrame(update);
+    }
+
+    function handleEnd(pWin) {
+        if(gameMode === 'vs') {
+            if(pWin) pScore++; else cpuScore++;
+            document.getElementById('p-score').innerText = `${pScore} - ${cpuScore}`;
+            document.getElementById('end-title').innerText = pWin ? "POINT SCORED!" : "YOU LOST";
+        }
+        document.getElementById('end-menu').style.display = 'flex';
+    }
+
+    function drawRacket(x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        // Grip & Handle
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-5, 30, 10, 45);
+        // Neck
+        ctx.fillStyle = '#2c3e50';
+        ctx.beginPath(); ctx.moveTo(-12, 30); ctx.lineTo(12, 30); ctx.lineTo(0, 5); ctx.fill();
+        // Frame (Damping area visual)
+        ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(0, 0, p1.r, 0, Math.PI * 2); ctx.stroke();
+        // Sweet Spot Visual
+        ctx.fillStyle = '#1e301b'; ctx.beginPath(); ctx.arc(0, 0, p1.r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(46, 204, 113, 0.1)'; ctx.beginPath(); ctx.arc(0, 0, p1.r * 0.85, 0, Math.PI * 2); ctx.fill();
+        // Pattern
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        for(let r = 5; r < p1.r - 5; r += 10) {
+            let count = Math.floor(r * 0.7);
+            for(let i = 0; i < count; i++) {
+                let a = (i/count) * Math.PI * 2;
+                ctx.beginPath(); ctx.arc(Math.cos(a)*r, Math.sin(a)*r, 1.5, 0, Math.PI*2); ctx.fill();
+            }
+        }
+        ctx.restore();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0e301b'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (gameMode === 'wall') {
+            ctx.fillStyle = '#333'; ctx.fillRect(0, 0, canvas.width, 10);
+        } else {
+            ctx.fillStyle = '#3498db'; ctx.fillRect(cpu.x, cpu.y, cpu.w, cpu.h);
+            ctx.setLineDash([5, 15]); ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.beginPath(); ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2); ctx.stroke();
+        }
+        drawRacket(mouseX, mouseY);
+        ctx.fillStyle = '#ccff00'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(ball.x-2, ball.y-2, ball.r/3, 0, Math.PI*2); ctx.fill();
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = Math.max(canvas.height/2 + 80, e.clientY - rect.top);
+    });
+</script>
+</body>
+</html>

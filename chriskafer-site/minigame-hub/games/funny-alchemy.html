@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Funny Alchemy - Infinite Craft</title>
+<style>
+    :root {
+        --bg: #1a1a1a;
+        --sidebar: #252525;
+        --text: #ffffff;
+        --accent: #4a90e2;
+    }
+
+    body {
+        margin: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        user-select: none;
+    }
+
+    /* --- Updated Sidebar Layout --- */
+    #sidebar {
+        width: 300px;
+        background-color: var(--sidebar);
+        border-right: 1px solid #333;
+        display: flex;
+        flex-direction: column; /* Stacks children vertically */
+        height: 100vh;
+        box-sizing: border-box;
+    }
+
+    /* Top Section: Draggable Elements */
+    .sidebar-header {
+        flex: 1; /* Takes up all available middle space */
+        overflow-y: auto; /* Scroll only this part when you have many elements */
+        padding: 20px;
+    }
+
+    /* Bottom Section: Recipes and Controls */
+    .sidebar-footer {
+        padding: 15px 20px;
+        background: #1e1e1e; /* Slightly darker to distinguish */
+        border-top: 2px solid #333;
+    }
+
+    .element-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    /* Recipe Log Styling */
+    #recipe-log {
+        font-size: 0.8rem;
+        color: #888;
+        max-height: 150px; /* Keeps log from taking over the screen */
+        overflow-y: auto;
+        margin: 10px 0;
+        background: rgba(0,0,0,0.2);
+        padding: 8px;
+        border-radius: 4px;
+    }
+
+    /* --- Buttons & UI --- */
+    .clear-btn {
+        width: 100%;
+        padding: 8px;
+        background: #444;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .clear-btn:hover {
+        background: #cc4b4b; /* Turns red when hovering to indicate clear */
+    }
+
+    /* --- Game Canvas Styling --- */
+    #canvas {
+        flex-grow: 1;
+        position: relative;
+        overflow: hidden;
+        background-image: radial-gradient(#333 1px, transparent 1px);
+        background-size: 40px 40px;
+    }
+
+    /* Element Styling */
+    .element {
+        padding: 8px 12px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 8px;
+        cursor: grab;
+        display: inline-block;
+        white-space: nowrap;
+        font-size: 0.9rem;
+    }
+
+    .element:active { cursor: grabbing; }
+    
+    .canvas-element {
+        position: absolute;
+        z-index: 10;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    .discovered {
+        background: linear-gradient(145deg, #3a3a3a, #222);
+        animation: pop 0.3s ease-out;
+    }
+
+    @keyframes pop {
+        0% { transform: scale(0.8); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    h2, h3 { margin: 0 0 15px 0; font-size: 1.1rem; color: var(--accent); }
+    h3 { font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h2>Inventory</h2>
+        <div id="element-palette" class="element-list">
+<div class="element" draggable="true" data-name="Water" ondragstart="drag(event)">💧 Water</div>
+<div class="element" draggable="true" data-name="Fire"  ondragstart="drag(event)">🔥 Fire</div>
+<div class="element" draggable="true" data-name="Wind"  ondragstart="drag(event)">🌬️ Wind</div>
+<div class="element" draggable="true" data-name="Earth" ondragstart="drag(event)">🌱 Earth</div>
+        </div>
+    </div>
+
+    <div class="sidebar-footer">
+        <button onclick="clearCanvas()" class="clear-btn">🧹 Clear Canvas</button>
+    </div>
+</div>
+
+<div id="canvas" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+
+<script>
+/* --- Basic drag & drop (no crafting yet) --- */
+function allowDrop(ev) {
+    ev.preventDefault();
+}
+
+
+function clearCanvas() {
+    document.getElementById("canvas").innerHTML = "";
+}
+    // The "Alchemy" Recipes
+    const recipes = {
+"Water+Water": "💦Water drop",
+"💦Water drop+💦Water drop": "💧Puddle",
+"💧Puddle+💧Puddle": "🌊Pond",
+"🌊Pond+🌊Pond": "🌊Lake",
+"🌊Lake+🌊Lake": "🌊Sea",
+"🌊Sea+🌊Sea": "🌊Ocean",
+"🌊Ocean+🌊Ocean": "🌊Water world",
+"🌊Water world+🌊Water world": "🌊Caseoh water",
+"Water+Wind": "🌊Wave",
+"🌊Wave+🌊Wave": "🌊Big wave",
+"🌊Big wave+🌊Big wave": "🌊Tsunami",
+"🌊Tsunami+🌊Tsunami": "🌊Giant tsunami",
+
+"Water+Fire": "💨Steam",
+"💨Steam+💨Steam": "☁️Cloud",
+"☁️Cloud+☁️Cloud": "☁️☁️☁️Cloud range",
+"☁️Cloud+Water": "🌧️Rain",
+"🌧️Rain+Wind": "⛈️Storm",
+"🌧️Rain+⚡Lightning": "⛈️Storm",
+
+"Wind+Wind": "🍃Heavy wind",
+"🍃Heavy wind+🍃Heavy wind": "🌪️Tornado",
+"🍃Heavy wind+⛈️Storm": "🌪️Tornado",
+"Wind+⛈️Storm": "🌪️Tornado",
+"🌪️Tornado+🌪️Tornado": "🌀Hurricane",
+"🌀Hurricane+🌀Hurricane": "🌀Typhoon",
+"🌀Typhoon+🌀Typhoon": "🌀Super Typhoon",
+
+"⛈️Storm+🌪️Tornado": "⛈️Disaster",
+"⛈️Storm+⛈️Storm": "⛈️Disaster",
+"Water+⛈️Storm": "🌊Flood",
+"🌊Pond+⛈️Storm": "🌊Flood",
+"🌊Tsunami+⛈️Storm": "🌊Flood",
+"🌊Wave+⛈️Storm": "🌊Flood",
+"🌊Giant tsunami+⛈️Storm": "🌊Flood",
+
+"Fire+Fire": "🔥Flame",
+"🔥Flame+🔥Flame": "🔥Firestorm",
+"🔥Firestorm+🔥Firestorm": "🔥Inferno",
+"🔥Inferno+🔥Inferno": "🔥Hellfire",
+"🔥Hellfire+🔥Hellfire": "🔥Fire apocalypse",
+"Fire+Wind": "💨🚬Smoke",
+"Steam+Wind": "💨🚬Smoke",
+
+"Earth+Water": "💩Mud",
+"Earth+Fire": "🌆Ruined lands",
+"Wind+Earth": "💨Dust",
+"💨Dust+🍃Heavy wind": "💨Dust devil",
+"💨Dust+🌪️Tornado": "💨Dust devil",
+"Earth+Rain": "🌴Plant",
+"🌴Plant+🌴Plant": "🌴Tree",
+"🌴Tree+⚡Lightning": "🪵Wood",
+"🪵Wood+🪨Stone": "⛏️Stone pickaxe",
+"☁️Cloud+Fire": "⚡Lightning",
+"⚡Lightning+⛈️Storm": "⛈️Thunderstorm",
+"🪵Wood+🪵Wood": "🏠Wood house",
+"🌴Plant+⛏️Stone pickaxe": "🍇Food",
+"🍇Food+💩Mud": "🍫Chocolate",
+"🍇Food+🪨Rock": "🥚Egg",
+
+"💨Steam+💨🚬Smoke": "💨Evaporation",
+"🪨Stone+💨Evaporation": "⏳Sand",
+"🪨rock+💨Evaporation": "⏳Sand",
+"⏳Sand+Fire": "🔎Glass",
+"🔎Glass+⏳Sand": "⏳Hourglass",
+"⏳Hourglass+⏳Hourglass": "⌚Time",
+"⏳Hourglass+⏳Sand": "⌚Time",
+"🥚Egg+⌚Time": "😺Small animal",
+"😺Small animal+😺Small animal": "🙉animal",
+"🙉animal+🙉animal": "🦍Big animal:,
+"⌚Time+⌚Time": "🌬️Speed",
+"🙉animal+🌬️Speed": "🐅Cheetah",
+"😺Small animal+🌬️Speed": "🐈Cat",
+"🦍Big animal+⌚Time": "🧠Intelligence",
+"🧠Intelligence+🦍Big animal": "🧑Human",
+"🙉animal+🧠Intelligence": "🧑Human",
+"😺Small animal+🧠Intelligence": "🧒Kid",
+"Earth+Earth": "🪨Rock",
+"🪨Rock+🪨Rock": "🪨Stone",
+"⛏️Stone pickaxe+🪨Stone": "🪙Iron ore",
+"🧑Human+⚙️Metal": "🤖Robot",
+
+"🪙Iron ore+Fire": "⚙️Metal",
+"⚙️Metal+Fire": "🥵Heat",
+"⚙️Metal+🪨Stone": "🔨Tool",
+"🪨Stone+🪨Stone": "🗻Hill",
+"🗻Hill+🗻Hill": "⛰️Mountain",
+"⛰️Mountain+⛰️Mountain": "⛰️⛰️⛰️⛰️Mountain range",
+"⛰️⛰️⛰️⛰️Mountain range+⛰️⛰️⛰️⛰️Mountain range": "🛖Village",
+"🛖Village+🛖Village": "🏠Town",
+"🏠Town+🏠Town": "🏢City",
+"🏢City+🏢City": "🌆Country",
+
+"🌆Country+🌆Country": "🌍Australia",
+"🌍Australia+🌍Australia": "🌍Europe",
+"🌍Europe+🌍Europe": "❄️Antarctica",
+"❄️Antarctica+❄️Antarctica": "🌍South America",
+"🌍South America+🌍South America": "🌍North america",
+"🌍North america+🌍North america": "🌍Africa",
+"🌍Africa+🌍Africa": "🌍Asia",
+"🌆Country+🗻Hill": "🌆Land",
+"Fire+💩Mud": "🌋Lava",
+"🌋Lava+⛰️Mountain": "🌋Volcano",
+
+"🌍Australia+🌍Europe": "🌎🌏🌍Continent",
+"🌍Australia+❄️Antarctica": "🌎🌏🌍Continent",
+"🌍Australia+🌍South America": "🌎🌏🌍Continent",
+"🌍Australia+🌍North america": "🌎🌏🌍Continent",
+"🌍Australia+🌍Africa": "🌎🌏🌍Continent",
+"🌍Australia+🌍Asia": "🌎🌏🌍Continent",
+
+"🌍Europe+❄️Antarctica": "🌎🌏🌍Continent",
+"🌍Europe+🌍South America": "🌎🌏🌍Continent",
+"🌍Europe+🌍North america": "🌎🌏🌍Continent",
+"🌍Europe+🌍Africa": "🌎🌏🌍Continent",
+"🌍Europe+🌍Asia": "🌎🌏🌍Continent",
+
+"❄️Antarctica+🌍South America": "🌎🌏🌍Continent",
+"❄️Antarctica+🌍North america": "🌎🌏🌍Continent",
+"❄️Antarctica+🌍Africa": "🌎🌏🌍Continent",
+"❄️Antarctica+🌍Asia": "🌎🌏🌍Continent",
+
+"🌍South America+🌍North america": "🌎🌏🌍Continent",
+"🌍South America+🌍Africa": "🌎🌏🌍Continent",
+"🌍South America+🌍Asia": "🌎🌏🌍Continent",
+
+"🌍North america+🌍Africa": "🌎🌏🌍Continent",
+"🌍North america+🌍Asia": "🌎🌏🌍Continent",
+
+"🌍Africa+🌍Asia": "🌎🌏🌍Continent",
+
+"🌎🌏🌍Continent+🌎🌏🌍Continent": "🗺️World",
+"🗺️World+🗺️World": "🪐Pluto",
+"🪐Pluto+🪐Pluto": "🌕Moon",
+"🌕Moon+🌕Moon": "🌑Mercury",
+"🌑Mercury+🌑Mercury": "🪐Mars",
+"🪐Mars+🪐Mars": "🪐Venus",
+"🪐Venus+🪐Venus": "🌍Planet Earth",
+"🌍Planet Earth+🌍Planet Earth": "🪐Neptune",
+"🪐Neptune+🪐Neptune": "🪐Uranus",
+"🪐Uranus+🪐Uranus": "🪐Saturn",
+"🪐Saturn+🪐Saturn": "🪐Jupiter",
+"🪐Pluto+🌕Moon": "☀️Solar System",
+"🪐Pluto+🌑Mercury": "☀️Solar System",
+"🪐Pluto+🪐Mars": "☀️Solar System",
+"🪐Pluto+🪐Venus": "☀️Solar System",
+"🪐Pluto+🌍Planet Earth": "☀️Solar System",
+"🪐Pluto+🪐Neptune": "☀️Solar System",
+"🪐Pluto+🪐Uranus": "☀️Solar System",
+"🪐Pluto+🪐Saturn": "☀️Solar System",
+"🪐Pluto+🪐Jupiter": "☀️Solar System",
+
+"🌕Moon+🌑Mercury": "☀️Solar System",
+"🌕Moon+🪐Mars": "☀️Solar System",
+"🌕Moon+🪐Venus": "☀️Solar System",
+"🌕Moon+🌍Planet Earth": "☀️Solar System",
+"🌕Moon+🪐Neptune": "☀️Solar System",
+"🌕Moon+🪐Uranus": "☀️Solar System",
+"🌕Moon+🪐Saturn": "☀️Solar System",
+"🌕Moon+🪐Jupiter": "☀️Solar System",
+
+"🌑Mercury+🪐Mars": "☀️Solar System",
+"🌑Mercury+🪐Venus": "☀️Solar System",
+"🌑Mercury+🌍Planet Earth": "☀️Solar System",
+"🌑Mercury+🪐Neptune": "☀️Solar System",
+"🌑Mercury+🪐Uranus": "☀️Solar System",
+"🌑Mercury+🪐Saturn": "☀️Solar System",
+"🌑Mercury+🪐Jupiter": "☀️Solar System",
+
+"🪐Mars+🪐Venus": "☀️Solar System",
+"🪐Mars+🌍Planet Earth": "☀️Solar System",
+"🪐Mars+🪐Neptune": "☀️Solar System",
+"🪐Mars+🪐Uranus": "☀️Solar System",
+"🪐Mars+🪐Saturn": "☀️Solar System",
+"🪐Mars+🪐Jupiter": "☀️Solar System",
+
+"🪐Venus+🌍Planet Earth": "☀️Solar System",
+"🪐Venus+🪐Neptune": "☀️Solar System",
+"🪐Venus+🪐Uranus": "☀️Solar System",
+"🪐Venus+🪐Saturn": "☀️Solar System",
+"🪐Venus+🪐Jupiter": "☀️Solar System",
+
+"🌍Planet Earth+🪐Neptune": "☀️Solar System",
+"🌍Planet Earth+🪐Uranus": "☀️Solar System",
+"🌍Planet Earth+🪐Saturn": "☀️Solar System",
+"🌍Planet Earth+🪐Jupiter": "☀️Solar System",
+
+"🪐Neptune+🪐Uranus": "☀️Solar System",
+"🪐Neptune+🪐Saturn": "☀️Solar System",
+"🪐Neptune+🪐Jupiter": "☀️Solar System",
+
+"🪐Uranus+🪐Saturn": "☀️Solar System",
+"🪐Uranus+🪐Jupiter": "☀️Solar System",
+
+"🪐Saturn+🪐Jupiter": "☀️Solar System",
+"☀️Solar System+Fire": "☀️Sun"
+};
+
+    let discovered = new Set(["Water", "Fire", "Wind", "Earth"]);
+
+
+function drag(ev) {
+    ev.dataTransfer.setData("name", ev.target.dataset.name);
+    if (ev.target.id) {
+        ev.dataTransfer.setData("sourceId", ev.target.id);
+    }
+}
+
+    function drop(ev) {
+        ev.preventDefault();
+        const name = ev.dataTransfer.getData("name");
+        const sourceId = ev.dataTransfer.getData("sourceId");
+        
+        const rect = document.getElementById('canvas').getBoundingClientRect();
+        const x = ev.clientX - rect.left;
+        const y = ev.clientY - rect.top;
+
+        // Check if dropped on another element
+        const targetElement = document.elementFromPoint(ev.clientX, ev.clientY);
+        const dropZoneElement = targetElement.closest('.canvas-element');
+
+        if (dropZoneElement && dropZoneElement.id !== sourceId) {
+            combine(name, dropZoneElement.dataset.name, dropZoneElement);
+            // Remove the dragged element if it was already on the canvas
+            if (sourceId) document.getElementById(sourceId).remove();
+        } else {
+            // Move or Create new element on canvas
+            if (sourceId) {
+                const el = document.getElementById(sourceId);
+                el.style.left = (x - 20) + 'px';
+                el.style.top = (y - 20) + 'px';
+            } else {
+                createElementOnCanvas(name, x, y);
+            }
+        }
+    }
+
+function createElementOnCanvas(name, x, y) {
+    const el = document.createElement("div");
+    el.className = "element canvas-element discovered";
+    el.dataset.name = name;
+    el.innerText = name;
+    el.id = "el-" + crypto.randomUUID();
+    el.draggable = true;
+    el.ondragstart = drag;
+    el.style.left = (x - 20) + "px";
+    el.style.top = (y - 20) + "px";
+    document.getElementById("canvas").appendChild(el);
+}
+
+
+function combine(a, b, targetNode) {
+    const result = recipes[`${a}+${b}`] || recipes[`${b}+${a}`];
+    if (!result) return;
+
+    const canvas = document.getElementById("canvas");
+    const rect = targetNode.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+
+    targetNode.remove();
+    createElementOnCanvas(
+        result,
+        rect.left - canvasRect.left,
+        rect.top - canvasRect.top
+    );
+
+    if (!discovered.has(result)) {
+        discovered.add(result);
+        addToSidebar(result);
+    }
+}
+
+function addToSidebar(name) {
+    const el = document.createElement("div");
+    el.className = "element";
+    el.dataset.name = name;
+    el.innerText = name;
+    el.draggable = true;
+    el.ondragstart = drag;
+    document.getElementById("element-palette").appendChild(el);
+}
+
+</script>
+
+</body>
+</html>
+
+

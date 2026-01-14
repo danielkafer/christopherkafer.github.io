@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connect 4 - Balanced Edition</title>
+<style>
+    :root { --bg:#ecf0f1; --cont:#ffffff; --text:#2c3e50; --accent:#3498db; --board-color:#2980b9; --border:#bdc3c7; }
+    [data-theme="dark"] { --bg:#2c3e50; --cont:#34495e; --text:#ecf0f1; --border:#555; }
+    body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; overflow:hidden; transition: 0.3s; }
+    .nav-btn { position:absolute; top:20px; background:#e67e22; color:white; padding:10px 15px; border-radius:10px; font-size:14px; font-weight:bold; cursor:pointer; box-shadow:0 4px 0 #d35400; text-decoration: none; z-index: 1000; }
+    .home-btn{left:20px} .theme-btn{right:20px}
+    #lobby,#game-container{ background:var(--cont); padding:1.5rem; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,.2); text-align:center; width:500px; position:relative; }
+    #game-container{display:none}
+    .card-setting{ margin-bottom:.8rem; padding:10px; background:rgba(0,0,0,.05); border-radius:10px; text-align: left; }
+    label{font-size:11px;font-weight:bold;text-transform:uppercase}
+    select,input[type=color]{ width:100%; border-radius:8px; padding:5px; background:var(--bg); color:var(--text); margin-top: 5px; border: 1px solid var(--border); }
+    #board{ background:var(--board-color); padding:10px; border-radius:15px; display:grid; grid-template-columns:repeat(7,1fr); gap:10px; box-shadow:0 8px 0 rgba(0,0,0,.3); }
+    .slot{ width:48px;height:48px; background:var(--bg); border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:24px; cursor:pointer; transition:.3s; }
+    .action-btn{ width:100%; background:var(--accent); color:white; border:none; font-weight:bold; margin-top:10px; cursor:pointer; padding:12px; border-radius:8px; box-shadow:0 4px 0 #2980b9; text-transform: uppercase; }
+    #end-menu{ position:absolute; inset:0; background:rgba(0,0,0,.85); border-radius:20px; display:none; flex-direction:column; justify-content:center; align-items:center; color:white; z-index: 100; }
+</style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn home-btn">🏠 HOME</a>
+    <button class="nav-btn theme-btn" onclick="toggleTheme()">🌓</button>
+
+    <div id="lobby">
+        <h1>Connect 4 Pro</h1>
+        <div class="card-setting">
+            <label>Match Settings</label>
+            <select id="gm"><option value="ai">vs Computer</option><option value="pvp">2 Players</option></select>
+            <select id="diff" style="margin-top:10px;">
+                <option value="easy">Difficulty: Easy</option>
+                <option value="medium">Difficulty: Medium</option>
+                <option value="hard" selected>Difficulty: Hard</option>
+            </select>
+        </div>
+        <div class="card-setting">
+            <label>Visuals & Audio</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">
+                <select id="p1-icon"><option value="none">P1</option><option>💀</option><option>🤖</option><option>👾</option></select>
+                <select id="p2-icon"><option value="none">P2</option><option>👿</option><option>👻</option><option>👽</option></select>
+                <input type="color" id="board-color" value="#2980b9">
+            </div>
+        </div>
+        <div class="card-setting">
+            <label>Colors</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <input type="color" id="p1-color" value="#e74c3c"><input type="color" id="p2-color" value="#f1c40f">
+            </div>
+        </div>
+        <button class="action-btn" onclick="startGame()">START MATCH</button>
+    </div>
+
+    <div id="game-container">
+        <h2 id="turn-display">Your Turn</h2>
+        <div id="board"></div>
+        <div id="end-menu">
+            <h2 id="win-text"></h2>
+            <button class="action-btn" onclick="resetGame()" style="width:200px;">PLAY AGAIN</button>
+            <button class="action-btn" onclick="location.reload()" style="background:#95a5a6;box-shadow:none;width:200px;">MENU</button>
+        </div>
+    </div>
+
+<script>
+const ROWS=6, COLS=7;
+let board=[], turn=1, active=true;
+
+const lobby = document.getElementById('lobby');
+const gameContainer = document.getElementById('game-container');
+const boardEl = document.getElementById('board');
+const turnDisplay = document.getElementById('turn-display');
+const endMenu = document.getElementById('end-menu');
+const winText = document.getElementById('win-text');
+const diff = document.getElementById('diff');
+const gm = document.getElementById('gm');
+const p1Color = document.getElementById('p1-color');
+const p2Color = document.getElementById('p2-color');
+const p1Icon = document.getElementById('p1-icon');
+const p2Icon = document.getElementById('p2-icon');
+const boardColorInput = document.getElementById('board-color');
+
+/* AUDIO */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSfx(freq, type = 'sine', dur = 0.2) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+
+function toggleTheme(){ document.body.dataset.theme = document.body.dataset.theme==="dark"?"light":"dark"; }
+
+function startGame(){
+    document.documentElement.style.setProperty('--board-color', boardColorInput.value);
+    lobby.style.display='none'; gameContainer.style.display='block';
+    resetGame();
+}
+
+function resetGame(){
+    board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+    turn = 1; active = true; endMenu.style.display='none';
+    turnDisplay.innerText = "Your Turn"; renderBoard();
+}
+
+function renderBoard(){
+    boardEl.innerHTML='';
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+        const s=document.createElement('div');
+        s.className='slot'; s.onclick=()=>dropPiece(c);
+        if(board[r][c]){
+            s.style.background=board[r][c]===1?p1Color.value:p2Color.value;
+            const icon = board[r][c]===1?p1Icon.value:p2Icon.value;
+            if(icon!=="none") s.innerText=icon;
+        }
+        boardEl.appendChild(s);
+    }
+}
+
+function dropPiece(col){
+    if(!active || (gm.value === 'ai' && turn === 2)) return;
+    const r = getRow(col);
+    if(r === -1) return;
+    board[r][col] = turn;
+    playSfx(440, 'sine', 0.1); renderBoard();
+    if(checkWin(r, col, turn)) return endGame(turn);
+    
+    if(gm.value === 'pvp'){
+        turn = turn === 1 ? 2 : 1;
+        turnDisplay.innerText = turn === 1 ? "Player 1's Turn" : "Player 2's Turn";
+    } else {
+        turn = 2; turnDisplay.innerText = "AI is thinking...";
+        setTimeout(aiMove, 400);
+    }
+}
+
+function getRow(c){
+    for(let r=ROWS-1;r>=0;r--) if(board[r][c]===0) return r;
+    return -1;
+}
+
+function aiMove(){
+    if(!active) return;
+    let col;
+    if(diff.value === "easy") col = Math.floor(Math.random()*COLS);
+    else if(diff.value === "medium") col = minimax(board, 3, -Infinity, Infinity, true).column;
+    else col = minimax(board, 7, -Infinity, Infinity, true).column;
+
+    const r = getRow(col);
+    if(r === -1) return aiMove();
+    board[r][col] = 2; playSfx(330, 'triangle', 0.1); renderBoard();
+    if(checkWin(r, col, 2)) return endGame(2);
+    turn = 1; turnDisplay.innerText = "Your Turn";
+}
+
+function minimax(tempBoard, depth, alpha, beta, isMaximizing) {
+    const validMoves = [...Array(COLS).keys()].filter(c => tempBoard[0][c] === 0);
+    if (depth === 0 || validMoves.length === 0) return { score: evaluateBoard(tempBoard) };
+    validMoves.sort((a, b) => Math.abs(3 - a) - Math.abs(3 - b));
+
+    if (isMaximizing) {
+        let maxEval = -Infinity; let bestCol = validMoves[0];
+        for (const col of validMoves) {
+            let row = getRow(col); tempBoard[row][col] = 2;
+            if (checkWin(row, col, 2)) { tempBoard[row][col] = 0; return { column: col, score: 100000 }; }
+            let ev = minimax(tempBoard, depth - 1, alpha, beta, false).score;
+            tempBoard[row][col] = 0;
+            if (ev > maxEval) { maxEval = ev; bestCol = col; }
+            alpha = Math.max(alpha, ev); if (beta <= alpha) break;
+        }
+        return { column: bestCol, score: maxEval };
+    } else {
+        let minEval = Infinity;
+        for (const col of validMoves) {
+            let row = getRow(col); tempBoard[row][col] = 1;
+            if (checkWin(row, col, 1)) { tempBoard[row][col] = 0; return { score: -100000 }; }
+            let ev = minimax(tempBoard, depth - 1, alpha, beta, true).score;
+            tempBoard[row][col] = 0;
+            minEval = Math.min(minEval, ev);
+            beta = Math.min(beta, ev); if (beta <= alpha) break;
+        }
+        return { score: minEval };
+    }
+}
+
+function evaluateBoard(b) {
+    let score = 0;
+    for (let r = 0; r < ROWS; r++) if (b[r][3] === 2) score += 3;
+    return score;
+}
+
+function checkWin(r,c,p){
+    const d=[[0,1],[1,0],[1,1],[1,-1]];
+    for(const[dr,dc] of d){
+        let cnt=1;
+        for(let i=1;i<4;i++) if(board[r+i*dr]?.[c+i*dc]===p) cnt++; else break;
+        for(let i=1;i<4;i++) if(board[r-i*dr]?.[c-i*dc]===p) cnt++; else break;
+        if(cnt>=4) return true;
+    }
+    return false;
+}
+
+function endGame(p){
+    active=false; playSfx(p === 1 ? 600 : 200, 'sawtooth', 0.4);
+    winText.innerText = p===1 ? "PLAYER 1 WINS!" : "AI WINS!";
+    endMenu.style.display='flex';
+}
+</script>
+</body>
+</html>
+

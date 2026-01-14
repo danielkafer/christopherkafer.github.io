@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe - Full Icon Edition</title>
+    <style>
+        :root {
+            --bg: #2c3e50;
+            --cont: #ffffff;
+            --text: #2c3e50;
+            --accent: #3498db;
+            --cell: #ecf0f1;
+        }
+
+        [data-theme="dark"] {
+            --bg: #2c3e50;
+            --cont: #34495e;
+            --text: #ecf0f1;
+            --cell: #2c3e50;
+        }
+
+        [data-theme="light"] {
+            --bg: #f1f2f6;
+            --cont: #ffffff;
+            --text: #2c3e50;
+            --cell: #ecf0f1;
+        }
+        
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            transition: 0.3s;
+        }
+        
+        /* Navigation Buttons */
+        .nav-btn {
+            position: absolute;
+            top: 20px;
+            background: #e67e22;
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 1000;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 0 #d35400;
+        }
+
+        .nav-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #d35400;
+        }
+
+        .home-btn { left: 20px; } 
+        
+        /* Tiny Buttons */
+        .small-btn { 
+            position: absolute; 
+            top: 20px; 
+            background: rgba(0,0,0,0.1); 
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 5px;
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 1000;
+            color: var(--text);
+        }
+
+        .theme-btn { right: 55px; }
+        .sett-btn { right: 20px; }
+
+        #lobby, #game-container, #settings-panel {
+            background: var(--cont);
+            padding: 1.5rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 400px;
+            position: relative;
+        }
+
+        #game-container, #settings-panel { display: none; }
+        
+        .card {
+            margin-bottom: 0.8rem;
+            padding: 10px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 10px;
+            text-align: left;
+        }
+
+        select, button {
+            padding: 8px;
+            width: 100%;
+            margin-top: 5px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background: var(--bg);
+            color: var(--text);
+        }
+        
+        .action-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #2980b9;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: var(--cell);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 2.2rem;
+            transition: 0.2s;
+        }
+
+        .cell.taken { cursor: default; }
+
+        #end-menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            border-radius: 20px;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #end-menu h2 { color: #f1c40f; margin-bottom: 20px; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn home-btn">🏠 HOME</a>
+    <button class="small-btn theme-btn" onclick="toggleTheme()">🌓</button>
+    <button class="small-btn sett-btn" id="live-sett-btn" style="display:none" onclick="showSettings()">⚙️</button>
+
+    <div id="lobby">
+        <h1 style="margin-top:0;">Tic-Tac-Toe</h1>
+        <div class="card">
+            <label>MODE</label>
+            <select id="gm" onchange="checkMode()">
+                <option value="pvp">2 PLAYER</option>
+                <option value="ai">vs COMPUTER</option>
+            </select>
+        </div>
+        <div id="diff-card" class="card" style="opacity:0.3; pointer-events:none;">
+            <label>AI DIFFICULTY</label>
+            <select id="diff">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Impossible</option>
+            </select>
+        </div>
+        <div class="card">
+            <label>Player 1 (X) Icon</label>
+            <select id="i1"></select>
+        </div>
+        <div class="card">
+            <label>Player 2 (O) Icon</label>
+            <select id="i2"></select>
+        </div>
+        <button class="action-btn" onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="settings-panel">
+        <h2>SETTINGS</h2>
+        <div class="card"><label>P1 Icon</label><select id="i1-live" onchange="icons.P1=this.value"></select></div>
+        <div class="card"><label>P2 Icon</label><select id="i2-live" onchange="icons.P2=this.value"></select></div>
+        <button class="action-btn" onclick="hideSettings()">RESUME</button>
+    </div>
+
+    <div id="game-container">
+        <div style="display:flex; justify-content:space-around; margin-bottom:10px;">
+            <div style="color:#e74c3c">P1 Wins: <span id="ms1">0</span></div>
+            <div style="color:#2ecc71">P2 Wins: <span id="ms2">0</span></div>
+        </div>
+        <div id="status" style="font-weight:bold; height: 1.5rem;">Turn: P1</div>
+        <div class="grid" id="board">
+            <div class="cell" data-i="0"></div><div class="cell" data-i="1"></div><div class="cell" data-i="2"></div>
+            <div class="cell" data-i="3"></div><div class="cell" data-i="4"></div><div class="cell" data-i="5"></div>
+            <div class="cell" data-i="6"></div><div class="cell" data-i="7"></div><div class="cell" data-i="8"></div>
+        </div>
+        <div id="end-menu">
+            <h2 id="win-text">DRAW!</h2>
+            <button class="action-btn" onclick="resetBoard()">NEXT ROUND</button>
+            <button class="action-btn" onclick="showSettings()">SETTINGS</button>
+            <button class="action-btn" onclick="location.reload()" style="background:#95a5a6; box-shadow:0 4px 0 #7f8c8d">MAIN MENU</button>
+        </div>
+    </div>
+
+<script>
+    // Full Icon Lists
+    const xList = ["X", "🥵", "😡", "👺", "🐖", "🦐", "🦞", "🦀", "🦜", "🐦", "🐞", "🪱", "🦋", "👅", "👄", "🫦", "🫀", "🧠", "🫁", "🤶", "💂‍♀️", "👮‍♀️", "👮‍♂️", "👮", "🧑‍🚒", "💃", "🎈", "🧨", "🧧", "🎀", "🎟️", "🎪", "🦺", "🛝", "🎢", "🧣", "🪭", "⛑️", "🤿", "🥅", "🛷", "🏓", "🎾", "🥊", "🎯", "🪆", "🎴", "♥️", "♦️", "📢", "🪗", "🩸", "🪛", "💊", "🧰", "🧲", "☎️", "📞", "📕", "🔖", "📮", "🖌️", "📉", "📍", "📌", "✂️", "⏰", "🍟", "🍿", "🥓", "🥫", "🥩", "🍜", "🍚", "🍣", "🫕", "🍬", "🫖", "🍷", "🍉", "🍎", "🍒", "🍓", "🌶️", "🍅", "🍄", "🍄‍🟫", "🌹", "🥀", "🍂", "🍁", "🚗", "🛻", "🚒", "🚑", "🦽", "🛼", "🚲", "🏎️", "🏍️", "🛵", "🚠", "🚋", "🚂", "🚇", "🚊", "🛩", "🚁", "🚀", "🛟", "🚨", "⛽", "🚩", "🌋", "🏖️", "🏘️", "🏗️", "🏜️", "🏩", "🏨", "🏯", "🏰", "🏭", "🌉", "🗼", "🌄", "🌅", "🌇", "🪠", "🪥", "🧯", "☄️", "🌡️", "❤️", "🧡", "❤️‍🩹", "❤️‍🔥", "💔", "❣️", "💕", "💞", "💝", "💘", "💖", "💓", "💥", "💢", "💌", "🈹", "🉐", "㊙️", "㊗️", "🈴", "🈵", "🈲", "🅰️", "🅱️", "🆎", "🆑", "❌", "📛", "🛑", "⛔", "🆘", "🅾️", "⭕", "🚫", "🚭", "🚷", "🚯", "🚳", "🚱", "🔞", "📵", "❗", "❓", "‼️", "⁉️", "💯", "🔴", "🟥", "🟧", "🟠", "🔶", "🔻", "🔺", "🔸"];
+    const oList = ["O", "😰", "😨", "😭", "🥶", "😱", "😇", "🐬", "🐳", "🐋", "🐟", "🐠", "🪼", "👮‍♀️", "👮‍♂️", "👮", "🤴", "👼", "👩‍🌾", "👨‍🌾", "👩‍🔧", "👨‍🔧", "🧑‍🌾", "🧑‍🏭", "👨‍🏭", "👩‍🏭", "🧑‍🔧", "👨‍🍼", "🦸‍♀️", "🦸‍♂️", "🦸", "🧙", "🧙‍♂️", "🧙‍♀️", "🙅‍♂️", "🙍‍♂️", "🧏‍♂️", "🙆‍♂️", "💁‍♂️", "🙋‍♂️", "🤦‍♂️", "🙇‍♂️", "🤷‍♂️", "💆‍♂️", "🧖‍♂️", "💇‍♂️", "🕺", "🛌", "🏄‍♂️", "🏂", "🚣‍♀️", "🚣‍♂️", "🏄", "🚣", "🏊‍♂️", "🤽‍♂️", "🏊", "🏋️‍♂️", "🤾‍♂️", "⛹️‍♂️", "🤸‍♂️", "🎭", "🎐", "🎞️", "🧵", "🪡", "🧶", "🪢", "👓", "👔", "🥽", "👖", "👘", "👗", "🩲", "🧦", "🛍️", "🥿", "🩴", "🧢", "💎", "⚽", "💍", "🎣", "🎿", "🛶", "🏸", "🥍", "🥏", "🥇", "🧿", "🪬", "🛢️", "🧫", "🩹", "🛡️", "♂️", "🪪", "🖥️", "💻", "🔍", "🔎", "📘", "💶", "🏧", "💳", "📫", "📪", "📭", "📬", "📤", "📥", "🖊", "🖋", "📅", "📆", "📈", "🗓️", "⌚", "⏲️", "🥣", "🍧", "🧁", "🍨", "🫗", "🧊", "🚙", "🚐", "🚄", "🚅", "🛴", "🦼", "🚆", "✈️", "🛫", "🛬", "💺", "⚓", "⛵", "🚤", "🛳️", "⛴️", "🚏", "🌎", "🌍", "🌌", "🗺️", "🌏", "🏞️", "🏙️", "🏬", "🧳", "🪟", "🛗", "🪣", "🚿", "🛁", "🛋️", "🪒", "🌧️", "🌀", "❄️", "☃️", "⛄", "🌊", "💧", "🌬️"];
+
+    function fillIcons() {
+        const s1 = document.getElementById('i1'), s2 = document.getElementById('i2'), s1L = document.getElementById('i1-live'), s2L = document.getElementById('i2-live');
+        xList.forEach(i => { const o = `<option value="${i}">${i}</option>`; s1.innerHTML += o; s1L.innerHTML += o; });
+        oList.forEach(i => { const o = `<option value="${i}">${i}</option>`; s2.innerHTML += o; s2L.innerHTML += o; });
+    }
+    fillIcons();
+
+    // Audio Setup
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playNote(f, t) { 
+        if (audioCtx.state === 'suspended') audioCtx.resume(); 
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain(); 
+        o.type = t; 
+        o.frequency.setValueAtTime(f, audioCtx.currentTime); 
+        g.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+        g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); 
+        o.connect(g); g.connect(audioCtx.destination); 
+        o.start(); o.stop(audioCtx.currentTime + 0.1); 
+    }
+
+    // Game Variables
+    let b = ["","","","","","","","",""], p = "P1", active = false, mode = "pvp", diff = "medium", icons = {P1:"X",P2:"O"}, score = {P1:0, P2:0};
+
+    function checkMode() { 
+        const v = document.getElementById('gm').value === 'pvp'; 
+        document.getElementById('diff-card').style.opacity = v ? "0.3" : "1"; 
+        document.getElementById('diff-card').style.pointerEvents = v ? "none" : "auto"; 
+    }
+
+    function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+    function showSettings() { document.getElementById('settings-panel').style.display='block'; document.getElementById('game-container').style.display='none'; }
+    function hideSettings() { document.getElementById('settings-panel').style.display='none'; document.getElementById('game-container').style.display='block'; }
+    
+    function startGame() { 
+        mode=document.getElementById('gm').value; 
+        diff=document.getElementById('diff').value; 
+        icons.P1=document.getElementById('i1').value; 
+        icons.P2=document.getElementById('i2').value; 
+        document.getElementById('lobby').style.display='none'; 
+        document.getElementById('game-container').style.display='block'; 
+        document.getElementById('live-sett-btn').style.display='flex'; 
+        resetBoard(); 
+    }
+
+    function resetBoard() { 
+        b=["","","","","","","","",""]; p="P1"; active=true; 
+        document.getElementById('status').innerText="Turn: "+icons.P1; 
+        document.getElementById('end-menu').style.display='none'; 
+        document.querySelectorAll('.cell').forEach(c=>{c.innerText=""; c.classList.remove('taken');}); 
+    }
+
+    document.querySelectorAll('.cell').forEach(c=>c.addEventListener('click', ()=>{ 
+        if(b[c.dataset.i]!=""||!active||(mode=="ai"&&p=="P2")) return; 
+        move(c.dataset.i); 
+    }));
+
+    function move(i) {
+        b[i]=p; const cell = document.querySelector(`[data-i='${i}']`); 
+        cell.innerText=icons[p]; cell.classList.add('taken');
+        p === "P1" ? playNote(440, 'sine') : playNote(330, 'triangle');
+        
+        if(checkWin(b, p)) { 
+            score[p]++; 
+            document.getElementById('ms1').innerText=score.P1; 
+            document.getElementById('ms2').innerText=score.P2; 
+            document.getElementById('win-text').innerText = (p === "P1" ? "PLAYER 1" : "PLAYER 2") + " WINS!"; 
+            end(); 
+        } else if(b.every(v=>v!="")) { 
+            document.getElementById('win-text').innerText = "DRAW!"; 
+            end(); 
+        } else { 
+            p = p=="P1" ? "P2" : "P1"; 
+            document.getElementById('status').innerText="Turn: "+icons[p]; 
+            if(mode=="ai"&&p=="P2") setTimeout(ai, 500); 
+        }
+    }
+
+    function end() { 
+        active=false; 
+        document.getElementById('end-menu').style.display='flex'; 
+        playNote(600, 'sine'); 
+    }
+
+    function checkWin(board, player) { 
+        const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]; 
+        return w.some(c=>c.every(i=>board[i]==player)); 
+    }
+
+    // AI Logic
+    function ai() { 
+        let idx; 
+        if(diff=="easy") idx = randomMove(); 
+        else if(diff=="medium") idx = Math.random()>0.4 ? minimax(b, "P2").idx : randomMove(); 
+        else idx = minimax(b, "P2").idx; 
+        move(idx); 
+    }
+
+    function randomMove() { 
+        let a=b.map((v,i)=>v==""?i:null).filter(v=>v!==null); 
+        return a[Math.floor(Math.random()*a.length)]; 
+    }
+
+    function minimax(nb, player) {
+        let a=nb.map((v,i)=>v==""?i:null).filter(v=>v!==null);
+        if(checkWin(nb, "P1")) return {score:-10}; 
+        if(checkWin(nb, "P2")) return {score:10}; 
+        if(a.length==0) return {score:0};
+        let moves=[]; 
+        for(let i = 0; i < a.length; i++){ 
+            let m={idx:a[i]}; nb[a[i]]=player; 
+            m.score = minimax(nb, player=="P2"?"P1":"P2").score; 
+            nb[a[i]]=""; moves.push(m); 
+        }
+        let bm; 
+        if(player=="P2"){ 
+            let bs=-Infinity; 
+            for(let i=0; i<moves.length; i++){ if(moves[i].score > bs){bs=moves[i].score; bm=i;}} 
+        } else { 
+            let bs=Infinity; 
+            for(let i=0; i<moves.length; i++){ if(moves[i].score < bs){bs=moves[i].score; bm=i;}} 
+        } 
+        return moves[bm];
+    }
+</script>
+</body>
+</html>

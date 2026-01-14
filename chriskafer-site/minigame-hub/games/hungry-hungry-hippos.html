@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hungry Hippos - Match Mastery</title>
+    <style>
+        :root { --p1: #ff4757; --p2: #2e86de; --bg: #2c3e50; --cont: #16a085; --text: white; }
+        [data-theme="light"] { --bg: #f1f2f6; --cont: #1abc9c; --text: #2c3e50; }
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: var(--bg); font-family: 'Arial Black', sans-serif; color: var(--text); overflow: hidden; transition: 0.3s; }
+        
+        .nav-btn { position: absolute; top: 20px; background: #e67e22; color: white; text-decoration: none; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 1000; cursor: pointer; border: none; box-shadow: 0 4px 0 #d35400; }
+        .home-btn { left: 20px; } .theme-btn { right: 20px; }
+
+        #lobby, #game-container { position: relative; background: var(--cont); padding: 30px; border-radius: 20px; border: 8px solid #27ae60; box-shadow: 0 20px 50px rgba(0,0,0,0.3); text-align: center; }
+        #game-container { display: none; padding: 0; border-radius: 50%; }
+        canvas { border-radius: 50%; outline: none; display: block; }
+
+        .ui-panel { position: absolute; top: -110px; width: 100%; display: flex; justify-content: space-between; font-size: 18px; text-shadow: 2px 2px 0px rgba(0,0,0,0.5); color: white; }
+        .match-wins { font-size: 12px; opacity: 0.8; margin-bottom: 2px; }
+        .score-val { font-size: 32px; display: block; font-weight: 900; }
+        
+        .btn-trigger { position: absolute; width: 80px; height: 80px; border-radius: 50%; border: 5px solid rgba(0,0,0,0.3); cursor: pointer; box-shadow: 0 6px 0 #000; color: white; font-size: 24px; transition: 0.1s; }
+        #btn-p1 { left: -100px; top: 260px; background: var(--p1); }
+        #btn-p2 { right: -100px; top: 260px; background: var(--p2); }
+
+        .card { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 15px; margin: 10px 0; text-align: left; transition: opacity 0.4s ease; }
+        .card.disabled { opacity: 0.3; pointer-events: none; }
+        select, input { width: 100%; padding: 8px; margin-top: 5px; border-radius: 5px; border: none; }
+        
+        #victory-screen { 
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            z-index: 2000; background: rgba(0,0,0,0.95); padding: 40px; border-radius: 30px; 
+            border: 4px solid #f1c40f; width: 320px; box-shadow: 0 0 100px rgba(0,0,0,0.8);
+        }
+        .action-btn { width: 100%; padding: 14px; font-size: 18px; background: #f39c12; border: none; color: white; border-radius: 50px; cursor: pointer; margin: 8px 0; box-shadow: 0 4px 0 #d35400; font-weight: bold; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn home-btn">🏠 HOME</a>
+    <button class="nav-btn theme-btn" onclick="toggleTheme()" style="right:20px">🌓</button>
+
+    <div id="lobby">
+        <h1 style="color: #f1c40f; margin-bottom: 5px;">HUNGRY HIPPOS</h1>
+        <div class="card">
+            <label>MODE</label>
+            <select id="gm" onchange="toggleAICard()">
+                <option value="ai">vs COMPUTER</option>
+                <option value="pvp">2 PLAYER</option>
+            </select>
+        </div>
+        <div class="card"><label>BALL SPEED</label><input type="range" id="spd" min="2" max="12" value="6"></div>
+        <div class="card"><label>HEAD REACH</label><input type="range" id="reach" min="150" max="320" value="245"></div>
+        <div class="card" id="ai-difficulty-card">
+            <label>AI DIFFICULTY</label>
+            <select id="diff">
+                <option value="0.005">Easy (Very Passive)</option>
+                <option value="0.04" selected>Medium (Standard)</option>
+                <option value="0.14">Hard (Aggressive)</option>
+            </select>
+        </div>
+        <button class="action-btn" onclick="startGame()">START MATCH</button>
+    </div>
+
+    <div id="game-container">
+        <div class="ui-panel">
+            <div style="color: var(--p1);">
+                <div class="match-wins">MATCHES: <span id="match-wins1">0</span></div>
+                RED ROUND<span id="wins1" class="score-val">0</span>
+            </div>
+            <div>
+                <div style="font-size: 14px; opacity: 0.8;">BALLS</div>
+                <div id="bl" style="font-size: 44px; color: #f1c40f; line-height: 1;">20</div>
+                <div id="round-num" style="font-size: 12px; margin-top: 5px; color: #fff;">ROUND 1</div>
+            </div>
+            <div style="color: var(--p2);">
+                <div class="match-wins">MATCHES: <span id="match-wins2">0</span></div>
+                BLUE ROUND<span id="wins2" class="score-val">0</span>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        
+        <div id="victory-screen">
+            <h2 id="win-text" style="font-size: 28px; margin-bottom: 10px;">RED WINS!</h2>
+            <p id="stat-text" style="margin-bottom: 20px; opacity: 0.9;">Score: 12 - 8</p>
+            <button class="action-btn" onclick="nextRound()">NEXT ROUND</button>
+            <button class="action-btn" onclick="location.reload()" style="background:#7f8c8d; box-shadow: 0 4px 0 #2c3e50;">EXIT MATCH</button>
+        </div>
+        
+        <button id="btn-p1" class="btn-trigger" onmousedown="hippo1.lunge()">A</button>
+        <button id="btn-p2" class="btn-trigger" onmousedown="hippo2.lunge()">L</button>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Audio Setup
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(freq, type, duration, vol = 0.1) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+
+    let s1 = 0, s2 = 0; 
+    let matchWins1 = 0, matchWins2 = 0; 
+    let roundCount = 1;
+    let balls = [], active = false, gameEnded = false;
+    let ballBaseSpeed = 6, maxReach = 245, aiDifficulty = 0.04, isPvP = false;
+
+    function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+
+    function toggleAICard() {
+        const mode = document.getElementById('gm').value;
+        const aiCard = document.getElementById('ai-difficulty-card');
+        if (mode === 'pvp') {
+            aiCard.classList.add('disabled');
+        } else {
+            aiCard.classList.remove('disabled');
+        }
+    }
+
+    class Hippo {
+        constructor(x, y, color, side) {
+            this.baseX = x; this.baseY = y; this.color = color; this.side = side;
+            this.neckLen = 0; this.state = 'IDLE'; this.mouthOpen = 0;
+            this.headX = x; this.headY = y;
+        }
+        update() {
+            if (this.state === 'LUNGING') {
+                this.neckLen += 11; this.mouthOpen = 1;
+                if (this.neckLen >= maxReach) this.state = 'RETRACTING';
+            } else if (this.state === 'RETRACTING') {
+                this.neckLen -= 6; this.mouthOpen = 0.2;
+                if (this.neckLen <= 0) { this.neckLen = 0; this.state = 'IDLE'; this.mouthOpen = 0; }
+            }
+            this.headX = this.baseX + this.side * this.neckLen;
+            this.headY = this.baseY;
+        }
+        draw() {
+            ctx.strokeStyle = this.color; ctx.lineWidth = 55; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(this.baseX, this.baseY); ctx.lineTo(this.headX, this.headY); ctx.stroke();
+            ctx.save();
+            ctx.translate(this.headX, this.headY);
+            ctx.rotate(this.side === -1 ? Math.PI : 0);
+            ctx.fillStyle = this.color;
+            ctx.beginPath(); ctx.roundRect(-15, 5, 80, 25, 10); ctx.fill(); 
+            ctx.beginPath(); ctx.roundRect(-15, -40 - (this.mouthOpen * 25), 85, 45, 15); ctx.fill(); 
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(15, -35 - (this.mouthOpen * 25), 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(20, -35 - (this.mouthOpen * 25), 5, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+        lunge() { 
+            if (this.state === 'IDLE' && !gameEnded) {
+                this.state = 'LUNGING';
+                playSound(400, 'square', 0.1, 0.05); // Lunge sound
+            }
+        }
+    }
+
+    class Ball {
+        constructor() {
+            this.active = true; this.radius = 12; this.isLastBall = false;
+            this.x = 300 + (Math.random()-0.5)*300; this.y = 300 + (Math.random()-0.5)*300;
+            const a = Math.random()*Math.PI*2;
+            this.vx = Math.cos(a)*ballBaseSpeed; this.vy = Math.sin(a)*ballBaseSpeed;
+        }
+        update() {
+            if (!this.active) return;
+            this.x += this.vx; this.y += this.vy;
+            const dx = this.x - 300; const dy = this.y - 300; const dist = Math.hypot(dx, dy);
+            if (dist > 226) {
+                const nx = dx / dist; const ny = dy / dist; const dot = this.vx * nx + this.vy * ny;
+                this.vx -= 2 * dot * nx; this.vy -= 2 * dot * ny;
+                const bounce = this.isLastBall ? 0.995 : 0.98;
+                this.vx *= bounce; this.vy *= bounce;
+                this.x = 300 + nx * 226; this.y = 300 + ny * 226;
+            }
+        }
+        draw() {
+            if (!this.active) return;
+            ctx.fillStyle = this.isLastBall ? "#ffff00" : "#f1c40f";
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            if(this.isLastBall) { ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke(); }
+        }
+    }
+
+    const hippo1 = new Hippo(60, 300, "#ff4757", 1);
+    const hippo2 = new Hippo(540, 300, "#2e86de", -1);
+
+    function startGame() {
+        ballBaseSpeed = parseInt(document.getElementById('spd').value);
+        maxReach = parseInt(document.getElementById('reach').value);
+        aiDifficulty = parseFloat(document.getElementById('diff').value);
+        isPvP = document.getElementById('gm').value === 'pvp';
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        initRound();
+        gameLoop();
+    }
+
+    function initRound() {
+        s1 = 0; s2 = 0;
+        gameEnded = false; active = true;
+        balls = Array.from({ length: 20 }, () => new Ball());
+        document.getElementById('victory-screen').style.display = 'none';
+        document.getElementById('round-num').innerText = `ROUND ${roundCount}`;
+    }
+
+    function nextRound() {
+        roundCount++;
+        initRound();
+    }
+
+    function gameLoop() {
+        if (!active) return requestAnimationFrame(gameLoop);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#1abc9c"; ctx.beginPath(); ctx.arc(300, 300, 250, 0, Math.PI*2); ctx.fill();
+
+        hippo1.update(); hippo2.update();
+        hippo1.draw(); hippo2.draw();
+
+        if (!isPvP && !gameEnded) {
+            const target = balls.find(b => b.active && b.x > 300);
+            if (target && Math.random() < aiDifficulty) hippo2.lunge();
+        }
+
+        const remBalls = balls.filter(b => b.active);
+        if (remBalls.length === 1 && !remBalls[0].isLastBall) {
+            remBalls[0].isLastBall = true; remBalls[0].vx *= 1.5; remBalls[0].vy *= 1.5;
+        }
+
+        remBalls.forEach(b => {
+            b.update(); b.draw();
+            [hippo1, hippo2].forEach(h => {
+                const dist = Math.hypot(b.x - h.headX, b.y - h.headY);
+                if (h.state === 'LUNGING' && dist < 52) {
+                    b.active = false;
+                    playSound(160, 'sine', 0.2, 0.2); // Eat sound
+                    if(h === hippo1) s1++; else s2++;
+                }
+            });
+        });
+
+        document.getElementById('bl').innerText = remBalls.length;
+        document.getElementById('wins1').innerText = s1;
+        document.getElementById('wins2').innerText = s2;
+
+        if (remBalls.length === 0 && !gameEnded) {
+            endRound();
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
+    function endRound() {
+        gameEnded = true;
+        // Victory fanfare
+        playSound(523, 'triangle', 0.3); 
+        setTimeout(() => playSound(659, 'triangle', 0.5), 150);
+
+        let winText = "";
+        if (s1 > s2) { matchWins1++; winText = "RED WINS!"; }
+        else if (s2 > s1) { matchWins2++; winText = "BLUE WINS!"; }
+        else { winText = "IT'S A DRAW!"; }
+
+        document.getElementById('match-wins1').innerText = matchWins1;
+        document.getElementById('match-wins2').innerText = matchWins2;
+        document.getElementById('win-text').innerText = winText;
+        document.getElementById('stat-text').innerText = `Final Score: ${s1} - ${s2}`;
+        document.getElementById('victory-screen').style.display = 'block';
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if(e.key.toLowerCase() === 'a') hippo1.lunge();
+        if(e.key.toLowerCase() === 'l') hippo2.lunge();
+    });
+</script>
+</body>
+</html>

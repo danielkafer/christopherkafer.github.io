@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird - Procedural Pro</title>
+    <style>
+        :root { --bg: #70c5ce; --cont: #ffffff; --text: #2c3e50; --accent: #e67e22; }
+        [data-theme="dark"] { --bg: #2c3e50; --cont: #34495e; --text: #ecf0f1; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Arial Black', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; transition: 0.3s; overflow: hidden; }
+        .nav-btn { position: absolute; top: 20px; background: #e67e22; color: white; text-decoration: none; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 1000; cursor: pointer; border: none; box-shadow: 0 4px 0 #d35400; }
+        #lobby, #game-container { background: var(--cont); padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; width: 420px; position: relative; }
+        #game-container { display: none; padding: 0; overflow: hidden; border: 5px solid #555; background: #70c5ce; }
+        .card-setting { margin-bottom: 0.8rem; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; text-align: left; }
+        label { font-size: 11px; opacity: 0.8; text-transform: uppercase; display: block; margin-bottom: 5px; }
+        select { width: 100%; cursor: pointer; border-radius: 5px; padding: 10px; border: 1px solid #ccc; background: var(--bg); color: var(--text); font-size: 16px; }
+        .action-btn { width: 100%; background: #f1c40f; color: #000; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; padding: 14px; border-radius: 8px; box-shadow: 0 4px 0 #f39c12; font-size: 16px; }
+        canvas { display: block; margin: 0 auto; cursor: pointer; }
+        #end-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; color: white; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn" style="left:20px;">🏠 HOME</a>
+
+    <div id="lobby">
+        <h1 style="color: #f1c40f; text-shadow: 2px 2px 0 #000;">FLAPPY PRO</h1>
+        <div class="card-setting">
+            <label>Select Skin</label>
+            <select id="skin-select">
+                <option value="classic">Original Chick</option>
+                <option value="pigeon">Flappy Pigeon</option>
+                <option value="crow">Flappy Crow</option>
+                <option value="chicken">Chicken</option>
+            </select>
+        </div>
+        <div class="card-setting">
+            <label>Difficulty</label>
+            <select id="diff-select">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+        </div>
+        <button class="action-btn" onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="game-container">
+        <canvas id="flappyCanvas" width="400" height="580"></canvas>
+        <div id="end-menu">
+            <h2>GAME OVER</h2>
+            <div id="final-score" style="font-size: 60px; color: #f1c40f; text-shadow: 3px 3px 0 #000;">0</div>
+            <button class="action-btn" onclick="startGame()" style="width: 200px;">RETRY</button>
+            <button class="action-btn" onclick="location.reload()" style="width: 200px; background:#95a5a6; box-shadow: 0 4px 0 #7f8c8d;">LOBBY</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('flappyCanvas');
+    const ctx = canvas.getContext('2d');
+    let bird, pipes, score, gameActive = false, lastTime = 0;
+
+    // Physics Constants
+    const GRAVITY = 0.45; 
+    const JUMP_IMPULSE = -7.5; 
+    const TERMINAL_VELOCITY = 10;
+    let pipeSpeed, pipeGap, selectedSkin;
+
+    function startGame() {
+        const diff = document.getElementById('diff-select').value;
+        if(diff === 'easy') { pipeGap = 195; pipeSpeed = 2.8; }
+        else if(diff === 'medium') { pipeGap = 155; pipeSpeed = 3.5; }
+        else { pipeGap = 120; pipeSpeed = 4.6; }
+
+        selectedSkin = document.getElementById('skin-select').value;
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        document.getElementById('end-menu').style.display = 'none';
+        
+        resetGame();
+        gameActive = true;
+        lastTime = performance.now(); 
+        requestAnimationFrame(update);
+    }
+
+    function resetGame() {
+        score = 0;
+        bird = { x: 80, y: canvas.height/2, velocity: 0, radius: 17, rotation: 0 };
+        pipes = [];
+        spawnPipe();
+    }
+
+    function spawnPipe() {
+        const minH = 70;
+        const h = Math.random() * (canvas.height - pipeGap - minH * 2) + minH;
+        pipes.push({ x: canvas.width, top: h, bottom: canvas.height - h - pipeGap, passed: false });
+    }
+
+    window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') flap(); });
+    canvas.addEventListener('mousedown', flap);
+
+    function flap() { if (!gameActive) return; bird.velocity = JUMP_IMPULSE; }
+
+    function update(time) {
+        if (!gameActive) return;
+        const dt = (time - lastTime) / 16.67; 
+        lastTime = time;
+
+        bird.velocity += GRAVITY * dt;
+        bird.velocity = Math.min(bird.velocity, TERMINAL_VELOCITY);
+        bird.y += bird.velocity * dt;
+
+        if (bird.y < 0 || bird.y + bird.radius > canvas.height) endGame();
+
+        pipes.forEach(p => {
+            p.x -= pipeSpeed * dt;
+            if (bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + 65) {
+                if (bird.y - bird.radius < p.top || bird.y + bird.radius > canvas.height - p.bottom) endGame();
+            }
+            if (!p.passed && p.x + 65 < bird.x) { p.passed = true; score++; }
+        });
+
+        if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 230) spawnPipe();
+        if (pipes[0] && pipes[0].x < -80) pipes.shift();
+        
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#70c5ce';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        pipes.forEach(p => {
+            let grad = ctx.createLinearGradient(p.x, 0, p.x + 65, 0);
+            grad.addColorStop(0, '#2ecc71'); grad.addColorStop(1, '#27ae60');
+            ctx.fillStyle = grad;
+            ctx.fillRect(p.x, 0, 65, p.top);
+            ctx.fillRect(p.x - 5, p.top - 20, 75, 20); // Lip
+            ctx.fillRect(p.x, canvas.height - p.bottom, 65, p.bottom);
+            ctx.fillRect(p.x - 5, canvas.height - p.bottom, 75, 20); // Lip
+        });
+
+        drawProceduralBird(ctx, bird, selectedSkin);
+
+        ctx.fillStyle = "white"; ctx.font = "bold 44px Arial"; ctx.textAlign = "center";
+        ctx.shadowBlur = 4; ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.fillText(score, canvas.width/2, 80);
+    }
+
+    function drawProceduralBird(ctx, bird, type) {
+        ctx.save();
+        ctx.translate(bird.x, bird.y);
+        
+        let rot = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, bird.velocity * 0.1));
+        ctx.rotate(rot);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+
+        let colors = { body: '#FFD700', beak: '#FF4500', wing: '#fff' };
+        if(type === 'pigeon') { colors.body = '#8888aa'; colors.beak = '#666'; }
+        if(type === 'crow') { colors.body = '#333'; colors.beak = '#111'; colors.wing = '#222'; }
+        if(type === 'chicken') { colors.body = '#fff'; colors.beak = '#f80'; }
+
+        // Body
+        ctx.beginPath();
+        ctx.fillStyle = colors.body;
+        ctx.arc(0, 0, bird.radius, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+
+        // Comb for chicken
+        if(type === 'chicken') {
+            ctx.beginPath(); ctx.fillStyle = 'red';
+            ctx.arc(0, -15, 5, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Eye
+        ctx.beginPath(); ctx.fillStyle = '#fff';
+        ctx.arc(6, -4, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.fillStyle = '#000';
+        ctx.arc(8, -4, 2, 0, Math.PI * 2); ctx.fill();
+
+        // Beak
+        ctx.beginPath(); ctx.fillStyle = colors.beak;
+        ctx.moveTo(10, 0); ctx.lineTo(22, 5); ctx.lineTo(10, 10);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+
+        // Wing
+        ctx.beginPath(); ctx.fillStyle = colors.wing;
+        ctx.ellipse(-5, 2, 8, 5, rot * 0.5, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function endGame() {
+        gameActive = false;
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('end-menu').style.display = 'flex';
+    }
+</script>
+</body>
+</html>
