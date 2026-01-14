@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Block Stack Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: white;
+        }
+        #gameContainer {
+            position: relative;
+            border: 3px solid #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(255,255,255,0.3);
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 200;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui">
+            <div>Score: <span id="score">0</span></div>
+            <div>High Score: <span id="highScore">0</span></div>
+            <div>Level: <span id="level">1</span></div>
+        </div>
+        <div id="gameOver">
+            <h2>Game Over!</h2>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button onclick="restartGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Game variables
+        let scene, camera, renderer, stack = [], currentBlock, shadowPlane;
+        let gameStarted = false, gameOver = false;
+        let score = 0, highScore = localStorage.getItem('highScore') || 0;
+        let level = 1, blockSpeed = 0.02;
+        let blockWidth = 4, blockDepth = 4;
+        let blocksPlaced = 0;
+
+        // Initialize the game
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(0x1e3c72, 10, 100);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(5, 15, 15);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth * 0.9, window.innerHeight * 0.8);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('gameContainer').appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            // Shadow plane
+            const planeGeometry = new THREE.PlaneGeometry(20, 20);
+            const planeMaterial = new THREE.MeshLambertMaterial({ color: 0x333333, transparent: true, opacity: 0.3 });
+            shadowPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.position.y = -0.1;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            // Start position indicator
+            createStartBlock();
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onKeyDown);
+
+            updateUI();
+            animate();
+        }
+
+        function createBlock(x = 0, y = 0, z = 0, color = null, width = blockWidth, depth = blockDepth) {
+            const geometry = new THREE.BoxGeometry(width, 1, depth);
+            const hue = color || Math.random();
+            const material = new THREE.MeshLambertMaterial({ 
+                color: new THREE.Color().setHSL(hue, 0.7, 0.6),
+                transparent: true,
+                opacity: 0.95
+            });
+            const block = new THREE.Mesh(geometry, material);
+            block.position.set(x, y, z);
+            block.castShadow = true;
+            block.receiveShadow = true;
+            block.userData = { width, depth, originalWidth: width, originalDepth: depth };
+            scene.add(block);
+            return block;
+        }
+
+        function createStartBlock() {
+            const startBlock = createBlock(0, 0, 0, 0.1);
+            stack.push(startBlock);
+        }
+
+        function spawnNewBlock() {
+            const lastBlock = stack[stack.length - 1];
+            const width = blockWidth * (0.9 + Math.random() * 0.2);
+            const depth = blockDepth * (0.9 + Math.random() * 0.2);
+            const newBlock = createBlock(
+                0,
+                lastBlock.position.y + 1.5,
+                0,
+                Math.random(),
+                width,
+                depth
+            );
+            newBlock.userData.speed = blockSpeed;
+            newBlock.userData.direction = Math.random() < 0.5 ? 1 : -1; // Move left or right
+            currentBlock = newBlock;
+        }
+
+        function updateBlockPosition() {
+            if (!currentBlock || gameOver) return;
+
+            currentBlock.position.x += currentBlock.userData.speed * currentBlock.userData.direction;
+
+            // Bounce back at edges
+            if (Math.abs(currentBlock.position.x) > 6) {
+                currentBlock.userData.direction *= -1;
+            }
+
+            // Update shadow
+            updateShadow();
+        }
+
+        function updateShadow() {
+            if (currentBlock) {
+                const shadow = currentBlock.userData.shadow;
+                if (shadow) {
+                    shadow.position.x = currentBlock.position.x;
+                    shadow.position.z = currentBlock.position.z;
+                    shadow.scale.x = currentBlock.userData.width / blockWidth;
+                    shadow.scale.z = currentBlock.userData.depth / blockDepth;
+                }
+            }
+        }
+
+        function placeBlock() {
+            if (!currentBlock || gameOver) return;
+
+            const lastBlock = stack[stack.length - 1];
+            currentBlock.position.y = lastBlock.position.y + 0.5;
+
+            // Snap to grid based on last block
+            const lastCenter = lastBlock.position.x;
+            const overlap = Math.max(0, Math.min(
+                lastBlock.userData.originalWidth,
+                currentBlock.userData.width,
+                lastCenter - currentBlock.position.x + currentBlock.userData.width / 2,
+                currentBlock.position.x - lastCenter + lastBlock.userData.originalWidth / 2
+            ));
+
+            // Check if block is too small (game over)
+            if (overlap < 0.3) {
+                gameOver = true;
+                document.getElementById('finalScore').textContent = score;
+                document.getElementById('gameOver').style.display = 'block';
+                return;
+            }
+
+            // Split block if overhang
+            if (currentBlock.userData.width > lastBlock.userData.originalWidth) {
+                const leftOverhang = (currentBlock.userData.width - lastBlock.userData.originalWidth) / 2;
+                splitBlock(currentBlock, lastCenter - leftOverhang, -1);
+                splitBlock(currentBlock, lastCenter + leftOverhang, 1);
+            }
+
+            stack.push(currentBlock);
+            blocksPlaced++;
+            score += Math.floor(overlap * 10) + level;
+            
+            if (blocksPlaced % 5 === 0) {
+                level++;
+                blockSpeed += 0.005;
+            }
+
+            currentBlock = null;
+            setTimeout(spawnNewBlock, 300);
+            updateUI();
+        }
+
+        function splitBlock(blockToRemove, cutPosition, direction) {
+            const pieceWidth = (blockToRemove.userData.width / 2);
+            const pieceDepth = blockToRemove.userData.depth;
+            
+            const piece = createBlock(
+                cutPosition,
+                blockToRemove.position.y,
+                blockToRemove.position.z,
+                new THREE.Color().getHSL(blockToRemove.material.color),
+                pieceWidth,
+                pieceDepth
+            );
+            
+            piece.position.y += 0.01; // Slight lift
+            scene.remove(blockToRemove);
+            
+            // Animate falling piece
+            const fallTween = { y: piece.position.y };
+            const animateFall = () => {
+                piece.position.y -= 0.05;
+                if (piece.position.y > -5) {
+                    requestAnimationFrame(animateFall);
+                } else {
+                    scene.remove(piece);
+                }
+            };
+            animateFall();
+        }
+
+        function onKeyDown(event) {
+            if (gameOver) return;
+
+            if (event.code === 'Space') {
+                event.preventDefault();
+                if (currentBlock && !gameStarted) {
+                    gameStarted = true;
+                }
+                placeBlock();
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('highScore').textContent = highScore;
+            document.getElementById('level').textContent = level;
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+            }
+        }
+
+        function restartGame() {
+            // Clear scene
+            stack.forEach(block => scene.remove(block));
+            if (currentBlock) scene.remove(currentBlock);
+            stack = [];
+            gameStarted = false;
+            gameOver = false;
+            score = 0;
+            level = 1;
+            blocksPlaced = 0;
+            blockSpeed = 0.02;
+            document.getElementById('gameOver').style.display = 'none';
+            
+            // Reset
+            scene.children.forEach(child => {
+                if (child !== shadowPlane && child !== camera && child.type !== 'AmbientLight' && child.type !== 'DirectionalLight') {
+                    scene.remove(child);
+                }
+            });
+            
+            createStartBlock();
+            updateUI();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth * 0.9, window.innerHeight * 0.8);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate camera around stack
+            const time = Date.now() * 0.0003;
+            camera.position.x = Math.cos(time) * 20;
+            camera.position.z = Math.sin(time) * 20;
+            camera.position.y = 10 + Math.sin(time * 0.7) * 3;
+            camera.lookAt(0, stack.length * 0.5, 0);
+
+            // Animate stack blocks slightly
+            stack.forEach((block, index) => {
+                block.rotation.y = Math.sin(Date.now() * 0.001 + index) * 0.05;
+                block.position.y = block.userData.originalY || 0 + Math.sin(Date.now() * 0.002 + index) * 0.02;
+            });
+
+            if (gameStarted && !gameOver && currentBlock) {
+                updateBlockPosition();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Add block shadow
+        function addShadowToBlock(block) {
+            const shadowGeometry = new THREE.PlaneGeometry(block.userData.width * 0.9, block.userData.depth * 0.9);
+            const shadowMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x000000, 
+                transparent: true, 
+                opacity: 0.3 
+            });
+            const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
+            shadow.rotation.x = -Math.PI / 2;
+            shadow.position.y = -0.05;
+            shadow.position.x = block.position.x;
+            shadow.position.z = block.position.z;
+            scene.add(shadow);
+            block.userData.shadow = shadow;
+        }
+
+        // Start the game
+        init();
+        spawnNewBlock();
+
+        // Show instructions
+        setTimeout(() => {
+            alert('🎮 3D Block Stack Game!\n\nPress SPACEBAR to drop the moving block.\nStack as high as you can without overhang!\nGood luck! 🚀');
+        }, 500);
+    </script>
+</body>
+</html>

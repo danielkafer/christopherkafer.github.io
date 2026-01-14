@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brick Breaker - Pro Edition</title>
+    <style>
+        :root { --bg: #2c3e50; --cont: #ffffff; --text: #2c3e50; --accent: #e74c3c; }
+        [data-theme="dark"] { --bg: #2c3e50; --cont: #34495e; --text: #ecf0f1; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Arial Black', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; transition: 0.3s; overflow: hidden; }
+        
+        .nav-btn { position: absolute; top: 20px; background: #e67e22; color: white; text-decoration: none; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 1000; cursor: pointer; border: none; box-shadow: 0 4px 0 #d35400; }
+        .home-btn { left: 20px; } .theme-btn { right: 20px; }
+
+        #lobby, #game-container { background: var(--cont); padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; width: 480px; position: relative; }
+        #game-container { display: none; }
+        
+        .ui-panel { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; font-weight: bold; }
+        .card-setting { margin-bottom: 0.8rem; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 10px; text-align: left; }
+        label { font-size: 11px; opacity: 0.8; text-transform: uppercase; }
+        input[type="range"] { width: 100%; margin-top: 5px; cursor: pointer; }
+        .action-btn { width: 100%; background: #3498db; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; padding: 12px; border-radius: 8px; box-shadow: 0 4px 0 #2980b9; }
+
+        canvas { background: #000; border: 5px solid #555; border-radius: 5px; display: block; margin: 0 auto; cursor: none; }
+        #end-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); border-radius: 20px; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; color: white; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn home-btn">🏠 HOME</a>
+    <button class="nav-btn theme-btn" onclick="toggleTheme()">🌓</button>
+
+    <div id="lobby">
+        <h1>Brick Breaker</h1>
+        <div class="card-setting" style="text-align: center; background: rgba(241, 196, 15, 0.1);">
+            <label>🏆 Personal Best</label>
+            <div id="high-score-val" style="font-size: 24px; color: #f1c40f;">0</div>
+        </div>
+        <div class="card-setting">
+            <label>Ball Speed</label>
+            <input type="range" id="speed-slider" min="3" max="10" value="6">
+        </div>
+        <div class="card-setting">
+            <label>Paddle Size</label>
+            <input type="range" id="paddle-slider" min="50" max="150" value="90">
+        </div>
+        <button class="action-btn" onclick="startGame()">START MATCH</button>
+    </div>
+
+    <div id="game-container">
+        <div class="ui-panel">
+            <div>SCORE: <span id="score">0</span></div>
+            <div style="color: #f1c40f;">MATCH WINS: <span id="match-wins">0</span></div>
+        </div>
+        <canvas id="breakCanvas" width="440" height="500"></canvas>
+        <div id="end-menu">
+            <h2 id="end-title" style="color:#f1c40f">LEVEL CLEAR!</h2>
+            <button class="action-btn" onclick="nextLevel()" style="width: 200px;">CONTINUE</button>
+            <button class="action-btn" onclick="location.reload()" style="width: 200px; background:#95a5a6; box-shadow: 0 4px 0 #7f8c8d;">MENU</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('breakCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let ball, paddle, bricks = [], score = 0, matchWins = 0, gameActive = false;
+    let ballSpeedBase = 6, paddleWidthBase = 90;
+
+    // Load High Score
+    let highScore = localStorage.getItem('breakHighScore') || 0;
+    document.getElementById('high-score-val').innerText = highScore;
+
+    function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+
+    function startGame() {
+        ballSpeedBase = parseInt(document.getElementById('speed-slider').value);
+        paddleWidthBase = parseInt(document.getElementById('paddle-slider').value);
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        resetGame(true);
+        requestAnimationFrame(update);
+    }
+
+    function resetGame(fullReset) {
+        if(fullReset) { score = 0; matchWins = 0; }
+        paddle = { x: canvas.width/2 - paddleWidthBase/2, y: canvas.height - 30, w: paddleWidthBase, h: 12 };
+        ball = { x: canvas.width/2, y: canvas.height - 50, vx: ballSpeedBase * (Math.random() > 0.5 ? 1 : -1), vy: -ballSpeedBase, r: 7 };
+        createBricks();
+        gameActive = true;
+        document.getElementById('end-menu').style.display = 'none';
+        document.getElementById('score').innerText = score;
+        document.getElementById('match-wins').innerText = matchWins;
+    }
+
+    function createBricks() {
+        bricks = [];
+        const rows = 5, cols = 7, w = 55, h = 20, pad = 5, offsetTop = 40, offsetLeft = 15;
+        for(let r=0; r<rows; r++) {
+            for(let c=0; c<cols; c++) {
+                bricks.push({ x: c*(w+pad)+offsetLeft, y: r*(h+pad)+offsetTop, w: w, h: h, active: true, color: `hsl(${r*40}, 70%, 50%)` });
+            }
+        }
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        paddle.x = e.clientX - rect.left - paddle.w/2;
+        if(paddle.x < 0) paddle.x = 0;
+        if(paddle.x + paddle.w > canvas.width) paddle.x = canvas.width - paddle.w;
+    });
+
+    function update() {
+        if(!gameActive) return;
+
+        // Move Ball
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Wall Collisions
+        if(ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) ball.vx *= -1;
+        if(ball.y - ball.r < 0) ball.vy *= -1;
+
+        // Paddle Collision
+        if(ball.y + ball.r > paddle.y && ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
+            // Calculate bounce angle based on where it hits the paddle
+            let hitPos = (ball.x - (paddle.x + paddle.w/2)) / (paddle.w/2);
+            ball.vx = hitPos * ballSpeedBase;
+            ball.vy = -Math.abs(ball.vy);
+        }
+
+        // Brick Collision
+        bricks.forEach(b => {
+            if(b.active) {
+                if(ball.x > b.x && ball.x < b.x + b.w && ball.y > b.y && ball.y < b.y + b.h) {
+                    ball.vy *= -1;
+                    b.active = false;
+                    score += 10;
+                    document.getElementById('score').innerText = score;
+                }
+            }
+        });
+
+        // Win Condition
+        if(bricks.every(b => !b.active)) {
+            matchWins++;
+            gameActive = false;
+            document.getElementById('end-title').innerText = "LEVEL CLEAR!";
+            document.getElementById('end-menu').style.display = 'flex';
+            if(score > highScore) localStorage.setItem('breakHighScore', score);
+        }
+
+        // Lose Condition
+        if(ball.y - ball.r > canvas.height) {
+            gameActive = false;
+            document.getElementById('end-title').innerText = "GAME OVER";
+            document.getElementById('end-menu').style.display = 'flex';
+        }
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Paddle
+        ctx.fillStyle = '#3498db'; ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+        
+        // Ball
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+        
+        // Bricks
+        bricks.forEach(b => {
+            if(b.active) {
+                ctx.fillStyle = b.color; ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.strokeStyle = 'black'; ctx.strokeRect(b.x, b.y, b.w, b.h);
+            }
+        });
+    }
+
+    function nextLevel() { resetGame(false); requestAnimationFrame(update); }
+</script>
+</body>
+</html>

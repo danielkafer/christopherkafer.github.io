@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Uno Pro - 108 Card Edition</title>
+    <style>
+        body { margin: 0; background: #1a1a2e; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        
+        .nav-btn { 
+            position: absolute; top: 20px; left: 20px; 
+            background: #e67e22; color: white; text-decoration: none; 
+            padding: 10px 15px; border-radius: 10px; font-weight: bold; 
+            box-shadow: 0 4px 0 #d35400; z-index: 2001; cursor: pointer; border: none; 
+        }
+        .nav-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #d35400; }
+
+        #game-container { 
+            position: relative; width: 1000px; height: 700px; 
+            background: radial-gradient(circle, #2c3e50 0%, #000 100%); 
+            border-radius: 50%; border: 8px solid rgba(255,255,255,0.1); 
+            display: flex; flex-direction: column; justify-content: space-between; 
+            padding: 40px; box-shadow: 0 0 50px rgba(0,0,0,0.5); 
+        }
+        
+        .hand { display: flex; gap: -20px; justify-content: center; height: 180px; align-items: center; }
+        
+        .card { 
+            width: 90px; height: 140px; border-radius: 12px; border: 4px solid white; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 28px; font-weight: 900; cursor: pointer; 
+            transition: all 0.2s ease; position: relative; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            user-select: none; margin-left: -15px;
+        }
+        .card:hover { transform: translateY(-30px) rotate(2deg); z-index: 100; box-shadow: 0 15px 30px rgba(0,0,0,0.6); }
+        
+        .red { background: #ff5555; }
+        .blue { background: #5555ff; }
+        .green { background: #55aa55; }
+        .yellow { background: #ffaa00; }
+        .wild { background: #222; border-color: #fff; }
+        
+        .card-inner { 
+            width: 75%; height: 85%; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; 
+            background: rgba(255,255,255,0.2); display: flex; 
+            align-items: center; justify-content: center; transform: rotate(-15deg); 
+        }
+        
+        #center-pile { display: flex; gap: 60px; justify-content: center; align-items: center; flex-grow: 1; }
+        
+        #deck { 
+            width: 95px; height: 145px; background: linear-gradient(135deg, #000 0%, #444 100%); 
+            border: 4px solid #fff; border-radius: 12px; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 16px; font-weight: 900; color: #ff5555; text-align: center; 
+        }
+        
+        #status { text-align: center; font-size: 24px; color: #00ffcc; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .wild-selector { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            display: none; gap: 10px; background: rgba(0,0,0,0.95); 
+            padding: 25px; border-radius: 15px; z-index: 2000; border: 2px solid white;
+        }
+        .color-btn { width: 60px; height: 60px; border-radius: 50%; border: 3px solid white; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <a href="../index.html" class="nav-btn">🏠 HOME</a><a href="../index.html" class="nav-btn">🏠 HOME</a>
+
+    <div id="status">Your Turn</div>
+
+    <div id="game-container">
+        <div id="ai-hand" class="hand"></div>
+
+        <div id="center-pile">
+            <div id="deck" onclick="playerDraw()">DRAW<br>CARD</div>
+            <div id="discard-pile"></div>
+        </div>
+
+        <div id="player-hand" class="hand"></div>
+    </div>
+
+    <div id="wild-selector" class="wild-selector">
+        <div class="color-btn red" onclick="selectWildColor('red')"></div>
+        <div class="color-btn blue" onclick="selectWildColor('blue')"></div>
+        <div class="color-btn green" onclick="selectWildColor('green')"></div>
+        <div class="color-btn yellow" onclick="selectWildColor('yellow')"></div>
+    </div>
+
+    <script>
+        const colors = ['red', 'blue', 'green', 'yellow'];
+        const values = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Skip', 'Reverse', 'Draw2'];
+        let fullDeck = [], playerHand = [], aiHand = [], discardCard = null, isPlayerTurn = true, pendingWild = false;
+
+        function createDeck() {
+            fullDeck = [];
+            // AUTHENTIC 108 CARD COMPOSITION
+            colors.forEach(c => {
+                // 1. Numerical Cards: One '0' per color
+                fullDeck.push({ color: c, value: '0', type: 'normal' });
+                
+                // 2. Numerical Cards: Two of each '1-9' per color
+                for (let i = 1; i <= 9; i++) {
+                    fullDeck.push({ color: c, value: i.toString(), type: 'normal' });
+                    fullDeck.push({ color: c, value: i.toString(), type: 'normal' });
+                }
+
+                // 3. Action Cards: Two of each (Skip, Reverse, Draw2) per color
+                for (let i = 0; i < 2; i++) {
+                    fullDeck.push({ color: c, value: 'Skip', type: 'normal' });
+                    fullDeck.push({ color: c, value: 'Reverse', type: 'normal' });
+                    fullDeck.push({ color: c, value: 'Draw2', type: 'normal' });
+                }
+            });
+
+            // 4. Wild Cards: Four 'Wild' and four 'Draw4'
+            for(let i=0; i<4; i++) {
+                fullDeck.push({ color: 'wild', value: 'Wild', type: 'wild' });
+                fullDeck.push({ color: 'wild', value: 'Draw4', type: 'wild' });
+            }
+
+            // Shuffle algorithm to randomize draw chance
+            fullDeck.sort(() => Math.random() - 0.5);
+        }
+
+        function draw() { 
+            if(fullDeck.length === 0) createDeck();
+            return fullDeck.pop(); 
+        }
+
+        function renderHand(elementId, hand, isHidden) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = '';
+            hand.forEach((card, i) => {
+                const div = document.createElement('div');
+                div.className = `card ${isHidden ? 'wild' : card.color}`;
+                if(!isHidden) {
+                    let display = card.value;
+                    if(display === 'Draw2') display = '+2';
+                    if(display === 'Draw4') display = '+4';
+                    div.innerHTML = `<div class="card-inner">${display}</div>`;
+                    div.onclick = () => playCard(i);
+                } else {
+                    div.innerHTML = `<div class="card-inner" style="background:#ff5555">?</div>`;
+                }
+                el.appendChild(div);
+            });
+        }
+
+        function renderDiscard() {
+            const pile = document.getElementById('discard-pile');
+            let display = discardCard.value;
+            if(display === 'Draw2') display = '+2';
+            if(display === 'Draw4') display = '+4';
+            pile.innerHTML = `<div class="card ${discardCard.color}"><div class="card-inner">${display}</div></div>`;
+        }
+
+        function playCard(index) {
+            if (!isPlayerTurn || pendingWild) return;
+            const card = playerHand[index];
+            if (card.color === 'wild' || card.color === discardCard.color || card.value === discardCard.value) {
+                discardCard = playerHand.splice(index, 1)[0];
+                if (discardCard.type === 'wild') {
+                    pendingWild = true;
+                    document.getElementById('wild-selector').style.display = 'flex';
+                } else {
+                    handleAction(discardCard, aiHand);
+                    endTurn();
+                }
+                render();
+            }
+        }
+
+        function selectWildColor(color) {
+            discardCard.color = color;
+            document.getElementById('wild-selector').style.display = 'none';
+            pendingWild = false;
+            if(discardCard.value === 'Draw4') { for(let i=0; i<4; i++) aiHand.push(draw()); }
+            endTurn();
+            render();
+        }
+
+        function handleAction(card, opponentHand) {
+            if(card.value === 'Draw2') { for(let i=0; i<2; i++) opponentHand.push(draw()); }
+            if(card.value === 'Skip' || card.value === 'Reverse') { isPlayerTurn = !isPlayerTurn; }
+        }
+
+        function endTurn() {
+            isPlayerTurn = !isPlayerTurn;
+            if(!isPlayerTurn) {
+                document.getElementById('status').innerText = "AI is thinking...";
+                setTimeout(aiTurn, 1000);
+            } else {
+                document.getElementById('status').innerText = "Your Turn";
+            }
+        }
+
+        function aiTurn() {
+            const index = aiHand.findIndex(c => c.color === 'wild' || c.color === discardCard.color || c.value === discardCard.value);
+            if (index !== -1) {
+                discardCard = aiHand.splice(index, 1)[0];
+                if(discardCard.type === 'wild') {
+                    discardCard.color = colors[Math.floor(Math.random()*4)];
+                    if(discardCard.value === 'Draw4') { for(let i=0; i<4; i++) playerHand.push(draw()); }
+                } else {
+                    handleAction(discardCard, playerHand);
+                }
+            } else {
+                aiHand.push(draw());
+            }
+            isPlayerTurn = true;
+            document.getElementById('status').innerText = "Your Turn";
+            render();
+            checkWin();
+        }
+
+        function playerDraw() {
+            if(!isPlayerTurn || pendingWild) return;
+            playerHand.push(draw());
+            endTurn();
+            render();
+        }
+
+        function checkWin() {
+            if(playerHand.length === 0) { alert("YOU WIN!"); reset(); }
+            else if(aiHand.length === 0) { alert("AI WINS!"); reset(); }
+        }
+
+        function render() {
+            renderHand('player-hand', playerHand, false);
+            renderHand('ai-hand', aiHand, true);
+            renderDiscard();
+        }
+
+        function reset() {
+            createDeck();
+            playerHand = []; aiHand = [];
+            for(let i=0; i<7; i++) { playerHand.push(draw()); aiHand.push(draw()); }
+            discardCard = draw();
+            while(discardCard.type === 'wild') discardCard = draw(); 
+            render();
+        }
+
+        reset();
+    </script>
+</body>
+</html>

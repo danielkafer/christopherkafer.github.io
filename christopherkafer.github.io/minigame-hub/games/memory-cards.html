@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Match - Pro Edition</title>
+    <style>
+        :root { --bg: #2c3e50; --cont: #ffffff; --text: #2c3e50; --accent: #3498db; --card-bg: #ecf0f1; --grid-size: 6; }
+        [data-theme="dark"] { --bg: #2c3e50; --cont: #34495e; --text: #ecf0f1; --card-bg: #2c3e50; }
+        [data-theme="light"] { --bg: #f1f2f6; --cont: #ffffff; --text: #2c3e50; --card-bg: #ecf0f1; }
+        
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; transition: 0.3s; }
+        
+        .nav-btn { position: absolute; top: 20px; background: #e67e22; color: white; text-decoration: none; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 1000; cursor: pointer; border: none; box-shadow: 0 4px 0 #d35400; }
+        .small-btn { position: absolute; top: 20px; background: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; z-index: 1000; color: var(--text); }
+        .theme-btn { right: 55px; } .sett-btn { right: 20px; } .home-btn { left: 20px; }
+
+        #lobby, #game-container, #settings-panel { background: var(--cont); padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; width: auto; min-width: 420px; position: relative; }
+        #game-container, #settings-panel { display: none; }
+        
+        .card-setting { margin-bottom: 0.8rem; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 10px; text-align: left; }
+        select, button { padding: 8px; width: 100%; margin-top: 5px; border-radius: 8px; border: 1px solid #ddd; background: var(--bg); color: var(--text); }
+        .action-btn { background: var(--accent); color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; box-shadow: 0 4px 0 #2980b9; }
+
+        #grid { 
+            display: grid; 
+            grid-template-columns: repeat(var(--grid-size), 1fr); 
+            gap: 8px; 
+            margin: 20px auto; 
+            max-width: 90vh;
+            width: fit-content;
+        }
+
+        .memory-card {
+            width: clamp(40px, 80vh / var(--grid-size), 80px);
+            aspect-ratio: 1;
+            background: var(--card-bg);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1.2rem, 40vh / var(--grid-size), 2.5rem);
+            cursor: pointer;
+            transition: 0.3s;
+            border: 2px solid rgba(0,0,0,0.1);
+            user-select: none;
+        }
+
+        .memory-card.flipped { background: var(--cont); border-color: var(--accent); }
+        .memory-card.matched { background: var(--cont); border-color: #2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.4); cursor: default; }
+
+        #end-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); border-radius: 20px; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; padding: 20px; box-sizing: border-box; }
+        #end-menu h2 { color: #f1c40f; margin-bottom: 20px; }
+    </style>
+</head>
+<body data-theme="dark">
+    <a href="../index.html" class="nav-btn home-btn">🏠 HOME</a>
+    <button class="small-btn theme-btn" onclick="toggleTheme()">🌓</button>
+    <button class="small-btn sett-btn" id="live-sett-btn" style="display:none" onclick="showSettings()">⚙️</button>
+
+    <div id="lobby">
+        <h1>Memory Match</h1>
+        <div class="card-setting">
+            <label>GRID SIZE</label>
+            <select id="grid-select">
+                <option value="2">2x2</option>
+                <option value="4">4x4</option>
+                <option value="6" selected>6x6</option>
+                <option value="8">8x8</option>
+            </select>
+        </div>
+        <div class="card-setting">
+            <label>THEME</label>
+            <select id="theme-set">
+                <option value="faces">😀 Emoji Faces</option>
+                <option value="transport">🚗 Transportation</option>
+                <option value="sports">⚽ Sports</option>
+                <option value="animals">🐾 Animals</option>
+                <option value="food">🍎 Food</option>
+            </select>
+        </div>
+        <button class="action-btn" onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="settings-panel">
+        <h2>SETTINGS</h2>
+        <div class="card-setting">
+            <label>Live Theme</label>
+            <select id="theme-live" onchange="currentTheme=this.value; initGame();">
+                <option value="faces">Emoji Faces</option>
+                <option value="transport">Transportation</option>
+                <option value="sports">Sports</option>
+                <option value="animals">Animals</option>
+                <option value="food">Food</option>
+            </select>
+        </div>
+        <button class="action-btn" onclick="hideSettings()">RESUME</button>
+    </div>
+
+    <div id="game-container">
+        <div style="display:flex; justify-content:space-around; margin-bottom:10px; font-weight:bold;">
+            <div>Moves: <span id="move-count">0</span></div>
+            <div>Time: <span id="timer">0</span>s</div>
+        </div>
+        <div id="grid"></div>
+        <div id="end-menu">
+            <h2 id="win-text">CLEARED!</h2>
+            <p id="stats-text" style="color:white; margin-bottom: 20px;"></p>
+            <button class="action-btn" onclick="startGame()">NEXT ROUND</button>
+            <button class="action-btn" onclick="showSettings()">SETTINGS</button>
+            <button class="action-btn" onclick="location.reload()" style="background:#95a5a6; box-shadow: 0 4px 0 #7f8c8d;">MAIN MENU</button>
+        </div>
+    </div>
+
+<script>
+    const themes = {
+        faces: ['😀','😃','😄','😁','😆','😅','😂','🤣','🥲','☺️','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥸','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤'],
+        transport: ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🏍️','🛵','🚲','🛺','🛴','🛹','🚀','🚁','🛩️','✈️','🛰️','🛸','🚤','🛥️','🛳️','⛴️','🚢','⚓','🛶','⛵','🚂','🚆','🚄','🚅','🚈','🚞','🚝','🚋','🚃','🚇','🏠','🛤️','🛫','🛬'],
+        sports: ['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🏓','🏸','🏒','🏑','🥍','🏏','🪃','🥅','⛳','🪁','🏹','🎣','🤿','🥊','🥋','⛸️','🎿','🛷','🛹','🛼','🏋️','🤼','🤸','⛹️','🤺','🤾','🏌️','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚵','🚴','🏆','🥇','🥈','🥉'],
+        animals: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐵','🐧','🐦','🐤','🦆','🦅','🦉','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐙','🐚','🐠','🐢','🦖','🐍','🐘','🦒','🦓','🦍','🦛','🦏','🐪','🐫','🐄','🐎','🐏','🐑','🐐','🐕','🐩','🐈','🐓','🦃','🕊️','🐇','🐿️'],
+        food: ['🍎','🍐','🍋','🍌','🍉','🍇','🍓','🫐','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🌽','🥕','🥔','🥖','🧀','🥓','🥩','🍗','🍔','🍟','🍕','🌮','🌯','🍜','🍣','🍤','🍦','🍩','🍪','🍫','🍰','🍭','🍮','🍯','🥛','☕','🍵','🥤','🍷','🍺','🍹','🧉']
+    };
+    let flipped = [], matchedCount = 0, moves = 0, timer = 0, timerInterval;
+    let currentTheme = 'faces', gridSize = 6, gameActive = false;
+
+    function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+    function showSettings() { document.getElementById('settings-panel').style.display='block'; document.getElementById('game-container').style.display='none'; }
+    function hideSettings() { document.getElementById('settings-panel').style.display='none'; document.getElementById('game-container').style.display='block'; }
+
+    function startGame() {
+        gridSize = parseInt(document.getElementById('grid-select').value);
+        currentTheme = document.getElementById('theme-set').value;
+        document.documentElement.style.setProperty('--grid-size', gridSize);
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        document.getElementById('live-sett-btn').style.display = 'flex';
+        initGame();
+    }
+
+    function initGame() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        moves = 0; timer = 0; matchedCount = 0; flipped = [];
+        document.getElementById('move-count').innerText = moves;
+        document.getElementById('timer').innerText = timer;
+        document.getElementById('end-menu').style.display = 'none';
+        
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => { timer++; document.getElementById('timer').innerText = timer; }, 1000);
+
+        let pairCount = (gridSize * gridSize) / 2;
+        let fullPool = [...themes[currentTheme]];
+        let selectedIcons = [];
+        
+        for(let i = 0; i < pairCount; i++) {
+            let randomIndex = Math.floor(Math.random() * fullPool.length);
+            selectedIcons.push(fullPool.splice(randomIndex, 1)[0]);
+        }
+
+        let gameIcons = [...selectedIcons, ...selectedIcons];
+        for (let i = gameIcons.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [gameIcons[i], gameIcons[j]] = [gameIcons[j], gameIcons[i]];
+        }
+
+        gameIcons.forEach(icon => {
+            const card = document.createElement('div');
+            card.className = 'memory-card';
+            card.dataset.icon = icon;
+            card.onclick = () => flipCard(card);
+            grid.appendChild(card);
+        });
+        gameActive = true;
+    }
+
+    function flipCard(card) {
+        if (!gameActive || flipped.length === 2 || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+        card.classList.add('flipped');
+        card.innerText = card.dataset.icon;
+        flipped.push(card);
+
+        if (flipped.length === 2) {
+            moves++;
+            document.getElementById('move-count').innerText = moves;
+            checkMatch();
+        }
+    }
+
+    function checkMatch() {
+        const [c1, c2] = flipped;
+        if (c1.dataset.icon === c2.dataset.icon) {
+            setTimeout(() => {
+                c1.classList.remove('flipped');
+                c2.classList.remove('flipped');
+                c1.classList.add('matched');
+                c2.classList.add('matched');
+                matchedCount += 2;
+                flipped = [];
+                if (gameActive && matchedCount === (gridSize * gridSize)) {
+                    setTimeout(endGame, 300);
+                }
+            }, 400);
+        } else {
+            setTimeout(() => {
+                c1.classList.remove('flipped');
+                c2.classList.remove('flipped');
+                c1.innerText = '';
+                c2.innerText = '';
+                flipped = [];
+            }, 800);
+        }
+    }
+
+    function endGame() {
+        gameActive = false;
+        clearInterval(timerInterval);
+        document.getElementById('stats-text').innerText = `Finished in ${timer}s using ${moves} moves.`;
+        document.getElementById('end-menu').style.display = 'flex';
+    }
+    </script>
+</body>
+</html>

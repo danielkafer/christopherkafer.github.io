@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade Hub - 15 Games Discovered</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --accent: #e94560;
+            --text: #ffffff;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            padding: 2.5rem 0;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 100%);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 3.5rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.4);
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            width: 90%;
+            max-width: 1200px;
+            padding: 2rem;
+        }
+
+        .game-card {
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border-color: var(--accent);
+        }
+
+        .game-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .game-title { font-size: 1.5rem; font-weight: bold; }
+        .game-desc { font-size: 0.9rem; opacity: 0.6; margin-top: 8px; line-height: 1.4; }
+
+        footer { margin: 3rem 0; opacity: 0.5; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Arcade Hub</h1>
+        <p>A Professional Collection of 15 Projects</p>
+    </header>
+
+    <div class="game-grid">
+        <a href="games/funny-alchemy.html" class="game-card">
+            <div class="game-icon">🧪</div>
+            <div class="game-title">the little Crafter</div>
+            <div class="game-desc">Find an uncountable amount of elements.</div>
+        </a>
+
+        <a href="games/uno.html" class="game-card">
+            <div class="game-icon">🃏</div>
+            <div class="game-title">Uno Pro</div>
+            <div class="game-desc">Full 108-card original deck with Action/Wild logic.</div>
+        </a>
+
+        <a href="games/3dbike-simulator.html" class="game-card">
+            <div class="game-icon">🏍️</div>
+            <div class="game-title">3D Bike Sim</div>
+            <div class="game-desc">High-speed physics simulator with 30° descents.</div>
+        </a>
+
+        <a href="games/memory-cards.html" class="game-card">
+            <div class="game-icon">🧠</div>
+            <div class="game-title">Memory Match</div>
+            <div class="game-desc">Classic brain training with professional flip UI.</div>
+        </a>
+
+        <a href="games/reaction-time.html" class="game-card">
+            <div class="game-icon">⚡</div>
+            <div class="game-title">Reaction Test</div>
+            <div class="game-desc">Measure your speed with our precision millisecond timer.</div>
+        </a>
+
+        <a href="games/brick-breaker.html" class="game-card">
+            <div class="game-icon">🧱</div>
+            <div class="game-title">Brick Breaker</div>
+            <div class="game-desc">Physics-based brick demolition with level tracking.</div>
+        </a>
+
+        <a href="games/tic-tac-toe.html" class="game-card">
+            <div class="game-icon">❌</div>
+            <div class="game-title">Tic Tac Toe</div>
+            <div class="game-desc">Clean, minimalistic strategy for the ultimate challenge.</div>
+        </a>
+
+        <a href="games/chess.html" class="game-card">
+            <div class="game-icon">♟️</div>
+            <div class="game-title">Chess Pro</div>
+            <div class="game-desc">Professional board engine with full move validation.</div>
+        </a>
+
+        <a href="games/pong.html" class="game-card">
+            <div class="game-icon">🎾</div>
+            <div class="game-title">Padel</div>
+            <div class="game-desc">Vertical arcade paddle action against a reactive AI.</div>
+        </a>
+
+        <a href="games/flappy-bird.html" class="game-card">
+            <div class="game-icon">🐥</div>
+            <div class="game-title">Flappy Bird</div>
+            <div class="game-desc">Smooth 240Hz physics implementation of a classic.</div>
+        </a>
+
+        <a href="games/stack-blocks.html" class="game-card">
+            <div class="game-icon">🧊</div>
+            <div class="game-title">Stack 3D</div>
+            <div class="game-desc">Isometric perspective block-stacking challenge.</div>
+        </a>
+
+        <a href="games/connect-four.html" class="game-card">
+            <div class="game-icon">🔴</div>
+            <div class="game-title">Connect 4</div>
+            <div class="game-desc">Advanced AI strategy game with win detection.</div>
+        </a>
+
+        <a href="games/snake.html" class="game-card">
+            <div class="game-icon">🐍</div>
+            <div class="game-title">Snake Pro</div>
+            <div class="game-desc">Ultra-responsive movement and deluxe visual skins.</div>
+        </a>
+
+        <a href="games/ice-hockey.html" class="game-card">
+            <div class="game-icon">🏒</div>
+            <div class="game-title">Ice Hockey</div>
+            <div class="game-desc">Precision physics and a sleek arcade interface.</div>
+        </a>
+
+        <a href="games/hungry-hungry-hippos.html" class="game-card">
+            <div class="game-icon">🦛</div>
+            <div class="game-title">Hungry Hippos</div>
+            <div class="game-desc">The project that started it all on Dec 31st!</div>
+        </a>
+    </div>
+
+    <footer>
+        &copy; 2026 Arcade Hub &bull; Built with Gemini 3 Flash
+    </footer>
+
+</body>
+</html>
